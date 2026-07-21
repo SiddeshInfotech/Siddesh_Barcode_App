@@ -8,6 +8,13 @@ build/
 local.properties
 !gradle/wrapper/gradle-wrapper.jar
 
+# Flutter / Dart / Pub
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/coverage/
+
 # Java / Maven
 target/
 **/target/
@@ -29,6 +36,12 @@ target/
 .project
 .settings/
 
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
 # Node & JS dependencies
 node_modules/
 **/node_modules/
@@ -41,6 +54,11 @@ yarn-error.log*
 .env.*
 !.env.example
 
+# Miscellaneous
+*.log
+*.pyc
+*.swp
+
 # OS Generated
 .DS_Store
 Thumbs.db
@@ -48,3 +66,27 @@ desktop.ini
 
 # Tool / Local Caches
 .claude/
+
+# Android Studio / build artifacts
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Additional local tooling
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
