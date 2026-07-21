@@ -1,21 +1,50 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
+# Gradle / Android
+.gradle/
+build/
+**/build/
 /captures
 .externalNativeBuild
 .cxx
 local.properties
+!gradle/wrapper/gradle-wrapper.jar
+
+# Java / Maven
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.aar
+*.apk
+
+# IDE & Editor files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+
+# Node & JS dependencies
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets
 .env
-.env.local
-/node_modules/
+.env.*
+!.env.example
 
+# OS Generated
+.DS_Store
+Thumbs.db
+desktop.ini
 
-
+# Tool / Local Caches
+.claude/
