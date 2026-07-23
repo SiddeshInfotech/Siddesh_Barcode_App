@@ -37,21 +37,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        String requestURI = request.getRequestURI();
+        String authorizationHeader = request.getHeader("Authorization");
+        log.info("JWT Filter: Request URI = {}, Authorization Header = {}", requestURI, authorizationHeader);
+
         try {
             String jwt = getJwtFromRequest(request);
+            log.info("JWT Filter: Parsed JWT Token = {}", jwt);
 
-            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                String username = tokenProvider.getUsernameFromJwt(jwt);
+            if (StringUtils.hasText(jwt)) {
+                boolean isValid = tokenProvider.validateToken(jwt);
+                log.info("JWT Filter: Token validation result = {}", isValid);
 
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                if (isValid) {
+                    String username = tokenProvider.getUsernameFromJwt(jwt);
+                    log.info("JWT Filter: Token username = {}", username);
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    log.info("JWT Filter: Loaded UserDetails for {}, authorities = {}", username, userDetails.getAuthorities());
+
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    log.info("JWT Filter: Successfully authenticated user '{}' and set SecurityContext", username);
+                } else {
+                    log.warn("JWT Filter: Token is not valid");
+                }
+            } else {
+                log.info("JWT Filter: No JWT token found in request headers");
             }
         } catch (Exception ex) {
-            log.error("Could not set user authentication in security context", ex);
+            log.error("JWT Filter: Could not set user authentication in security context", ex);
         }
 
         filterChain.doFilter(request, response);
@@ -59,8 +77,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private String getJwtFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
+        if (StringUtils.hasText(bearerToken)) {
+            String token = bearerToken.trim();
+            if (token.toLowerCase().startsWith("bearer ")) {
+                token = token.substring(7).trim();
+            }
+            // Double check if the user mistakenly prefixed it again (e.g. Bearer Bearer <token>)
+            if (token.toLowerCase().startsWith("bearer ")) {
+                token = token.substring(7).trim();
+            }
+            // Strip surrounding double quotes if present
+            if (token.startsWith("\"") && token.endsWith("\"") && token.length() > 1) {
+                token = token.substring(1, token.length() - 1).trim();
+            }
+            // Strip surrounding single quotes if present
+            if (token.startsWith("'") && token.endsWith("'") && token.length() > 1) {
+                token = token.substring(1, token.length() - 1).trim();
+            }
+            return token;
         }
         return null;
     }

@@ -86,6 +86,8 @@ public class JwtTokenProvider {
         try {
             Jwts.parser().verifyWith(key).build().parseSignedClaims(authToken);
             return true;
+        } catch (io.jsonwebtoken.security.SignatureException e) {
+            log.error("Invalid JWT signature: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
             log.error("JWT token is expired: {}", e.getMessage());
         } catch (MalformedJwtException e) {

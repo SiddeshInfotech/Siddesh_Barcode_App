@@ -57,15 +57,6 @@ public class SecurityConfig {
         this.tokenProvider = tokenProvider;
     }
 
-    /**
-     * Bean declaration for JwtAuthenticationFilter.
-     *
-     * @return a new instance of JwtAuthenticationFilter
-     */
-    @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(tokenProvider, userDetailsService);
-    }
 
     /**
      * Bean declaration for PasswordEncoder using BCrypt hashing.
@@ -134,7 +125,7 @@ public class SecurityConfig {
             );
 
         http.authenticationProvider(authenticationProvider());
-        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(new JwtAuthenticationFilter(tokenProvider, userDetailsService), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
