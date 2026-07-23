@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Miscellaneous / OS
 *.class
 *.log
@@ -11,6 +10,7 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+desktop.ini
 .atom/
 .build/
 .buildlog/
@@ -18,45 +18,7 @@ Thumbs.db
 .svn/
 .swiftpm/
 migrate_working_dir/
-=======
-# Gradle / Android
-.gradle/
-build/
-**/build/
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-!gradle/wrapper/gradle-wrapper.jar
-
-# Flutter / Dart / Pub
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/coverage/
-
-# Java / Maven
-target/
-**/target/
-*.class
-*.jar
-*.war
-*.ear
-*.nar
-*.aar
-*.apk
-
-# IDE & Editor files
-.idea/
-*.iml
-*.ipr
-*.iws
-.vscode/
-.classpath
-.project
-.settings/
->>>>>>> origin/backend-mahim
+.claude/
 
 # Environment files & secret configurations
 .env
@@ -67,6 +29,13 @@ target/
 # Build & execution log files
 buildlog*.txt
 runlog*.txt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Node & JS dependencies
+node_modules/
+**/node_modules/
 
 # IntelliJ / Android Studio / IDE
 *.iml
@@ -75,46 +44,16 @@ runlog*.txt
 .idea/
 *.workspace
 *.user
+.classpath
+.project
+.settings/
 
-<<<<<<< HEAD
 # VS Code
 .vscode/
-=======
-# Node & JS dependencies
-node_modules/
-**/node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Environment & Secrets
-.env
-.env.*
-!.env.example
-
-# Miscellaneous
-*.log
-*.pyc
-*.swp
-
-# OS Generated
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Tool / Local Caches
-.claude/
-
-# Android Studio / build artifacts
-/android/app/debug
-/android/app/profile
-/android/app/release
->>>>>>> origin/backend-mahim
 
 # Flutter / Dart / Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
-<<<<<<< HEAD
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
@@ -124,10 +63,15 @@ desktop.ini
 build/
 **/build/
 coverage/
-=======
->>>>>>> origin/backend-mahim
+/coverage/
 
-# Android Gradle & Build artifacts
+# Java / Maven / Gradle & Android build artifacts
+target/
+**/target/
+*.jar
+*.war
+*.ear
+*.nar
 .gradle/
 **/.gradle/
 **/android/.gradle/
@@ -138,6 +82,7 @@ coverage/
 **/android/local.properties
 **/local.properties
 **/captures/
+.externalNativeBuild
 
 # Android outputs & binaries
 *.apk
@@ -181,15 +126,3 @@ coverage/
 # Symbolication & Obfuscation
 app.*.symbols
 app.*.map.json
-
-<<<<<<< HEAD
-=======
-# Additional local tooling
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
->>>>>>> origin/backend-mahim

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'scan_barcode_screen.dart';
+import 'barcode_scanner_screen.dart';
 
 class ProductNotFoundScreen extends StatelessWidget {
   final String barcode;
@@ -163,7 +163,7 @@ class ProductNotFoundScreen extends StatelessWidget {
                         onPressed: () {
                           // Replace current route with a new barcode scanner screen
                           Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(builder: (_) => const ScanBarcodeScreen()),
+                            MaterialPageRoute(builder: (_) => const BarcodeScannerScreen(mode: ScannerMode.inward)),
                           );
                         },
                         style: ElevatedButton.styleFrom(

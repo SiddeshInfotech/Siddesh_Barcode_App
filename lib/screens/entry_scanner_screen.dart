@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../services/barcode_scanner_service.dart';
-import '../widgets/bottom_controls.dart';
-import '../widgets/camera_view.dart';
-import '../widgets/laser_animation.dart';
 import '../widgets/scanner_overlay.dart';
 
 class EntryScannerScreen extends StatefulWidget {
@@ -27,7 +23,6 @@ class _EntryScannerScreenState extends State<EntryScannerScreen> {
     ],
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
-  final BarcodeScannerService _scannerService = BarcodeScannerService();
 
   bool _isProcessing = false;
 
@@ -44,7 +39,9 @@ class _EntryScannerScreenState extends State<EntryScannerScreen> {
     if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
       _isProcessing = true;
       _controller.stop();
-      _scannerService.processBarcode(context, barcodes.first.rawValue!);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Scanned: ${barcodes.first.rawValue}')),
+      );
     }
   }
 
@@ -56,6 +53,8 @@ class _EntryScannerScreenState extends State<EntryScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const scanWindowSize = Size(260, 260);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F8FF),
       appBar: AppBar(
@@ -112,25 +111,20 @@ class _EntryScannerScreenState extends State<EntryScannerScreen> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      CameraView(
+                      MobileScanner(
                         controller: _controller,
                         onDetect: _onDetect,
                       ),
-                      const Center(
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            ScannerOverlay(),
-                            LaserAnimation(size: 260),
-                          ],
-                        ),
+                      ScannerOverlay(
+                        scanWindowSize: scanWindowSize,
+                        isScanning: true,
                       ),
-                      Positioned(
+                      const Positioned(
                         bottom: 24,
                         left: 0,
                         right: 0,
                         child: Center(
-                          child: const Text(
+                          child: Text(
                             'Align barcode within the frame',
                             style: TextStyle(
                               fontFamily: 'Poppins',
@@ -145,12 +139,6 @@ class _EntryScannerScreenState extends State<EntryScannerScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            BottomControls(
-              controller: _controller,
-              onGalleryTap: () =>
-                  _scannerService.pickImageFromGallery(context, _controller),
-            ).animate().slideY(begin: 1, duration: 300.ms, curve: Curves.easeOut),
             const SizedBox(height: 22),
           ],
         ),
