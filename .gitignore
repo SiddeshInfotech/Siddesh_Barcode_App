@@ -1,9 +1,15 @@
-# Miscellaneous
+# Miscellaneous / OS
 *.class
 *.log
 *.pyc
 *.swp
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 .atom/
 .build/
 .buildlog/
@@ -12,34 +18,92 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# Environment files & secret configurations
+.env
+.env.*
+!.env.example
+*.env
+
+# Build & execution log files
+buildlog*.txt
+runlog*.txt
+
+# IntelliJ / Android Studio / IDE
 *.iml
 *.ipr
 *.iws
 .idea/
+*.workspace
+*.user
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code
+.vscode/
 
-# Flutter/Dart/Pub related
+# Flutter / Dart / Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
-/build/
-/coverage/
+build/
+**/build/
+coverage/
 
-# Symbolication related
+# Android Gradle & Build artifacts
+.gradle/
+**/.gradle/
+**/android/.gradle/
+**/android/app/build/
+**/android/build/
+**/android/app/.cxx/
+**/android/.cxx/
+**/android/local.properties
+**/local.properties
+**/captures/
+
+# Android outputs & binaries
+*.apk
+*.aab
+*.dex
+*.so
+*.aar
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+
+# iOS artifacts
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.framework
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Runner/GeneratedPluginRegistrant.h
+**/ios/Runner/GeneratedPluginRegistrant.m
+**/ios/Runner.xcodeproj/project.xcworkspace
+**/ios/Runner.xcworkspace
+
+# macOS desktop artifacts
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Windows desktop artifacts
+**/windows/flutter/ephemeral/
+**/windows/flutter/generated_plugin_registrant.cc
+**/windows/flutter/generated_plugin_registrant.h
+**/windows/flutter/generated_plugins.cmake
+
+# Linux desktop artifacts
+**/linux/flutter/ephemeral/
+**/linux/flutter/generated_plugin_registrant.cc
+**/linux/flutter/generated_plugin_registrant.h
+**/linux/flutter/generated_plugins.cmake
+
+# Symbolication & Obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release

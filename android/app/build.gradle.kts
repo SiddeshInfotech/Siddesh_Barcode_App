@@ -1,24 +1,21 @@
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.example.siddesh_barcode_app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.siddesh_barcode_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -27,19 +24,50 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
-    }
-}
-
 flutter {
     source = "../.."
+}
+
+val flutterRootOutputsDir = File(rootProject.projectDir.parentFile, "build/app/outputs")
+val flutterRootFlutterApkDir = File(flutterRootOutputsDir, "flutter-apk")
+val flutterRootDebugApkDir = File(flutterRootOutputsDir, "apk/debug")
+val flutterRootReleaseApkDir = File(flutterRootOutputsDir, "apk/release")
+
+tasks.register<Copy>("syncDebugFlutterApk") {
+    from(layout.buildDirectory.dir("outputs/apk/debug"))
+    include("app-debug.apk", "output-metadata.json")
+    into(flutterRootFlutterApkDir)
+}
+
+tasks.register<Copy>("syncDebugStandardApk") {
+    from(layout.buildDirectory.dir("outputs/apk/debug"))
+    include("app-debug.apk", "output-metadata.json")
+    into(flutterRootDebugApkDir)
+}
+
+tasks.register<Copy>("syncReleaseFlutterApk") {
+    from(layout.buildDirectory.dir("outputs/apk/release"))
+    include("app-release.apk", "output-metadata.json")
+    into(flutterRootFlutterApkDir)
+}
+
+tasks.register<Copy>("syncReleaseStandardApk") {
+    from(layout.buildDirectory.dir("outputs/apk/release"))
+    include("app-release.apk", "output-metadata.json")
+    into(flutterRootReleaseApkDir)
+}
+
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    finalizedBy("syncDebugFlutterApk")
+    finalizedBy("syncDebugStandardApk")
+}
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    finalizedBy("syncReleaseFlutterApk")
+    finalizedBy("syncReleaseStandardApk")
 }

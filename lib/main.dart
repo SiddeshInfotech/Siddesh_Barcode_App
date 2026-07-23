@@ -1,20 +1,27 @@
 import 'package:flutter/material.dart';
+
 import 'screens/dashboard_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const InventoryApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class InventoryApp extends StatelessWidget {
+  const InventoryApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Siddesh Barcode App',
+      debugShowCheckedModeBanner: false,
+      title: 'Inventory Management',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3BA8FF)),
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF3BA8FF),
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF7FBFF),
+        fontFamily: 'Poppins',
       ),
       home: const DashboardScreen(),
     );
