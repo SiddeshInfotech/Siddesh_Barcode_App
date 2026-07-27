@@ -2,50 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../models/product_model.dart';
 
-class Product {
-  final int id;
-  final String name;
-  final String description;
-  final String barcode;
-  final double price;
-  final int quantity;
-  final String sku;
-  final String category;
-  final String brand;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-
-  Product({
-    required this.id,
-    required this.name,
-    required this.description,
-    required this.barcode,
-    required this.price,
-    required this.quantity,
-    required this.sku,
-    required this.category,
-    required this.brand,
-    this.createdAt,
-    this.updatedAt,
-  });
-
-  factory Product.fromJson(Map<String, dynamic> json) {
-    return Product(
-      id: json['id'] as int? ?? 0,
-      name: json['name'] as String? ?? 'Not Available',
-      description: json['description'] as String? ?? 'Not Available',
-      barcode: json['barcode'] as String? ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      quantity: json['quantity'] as int? ?? 0,
-      sku: json['sku'] as String? ?? 'Not Available',
-      category: json['category'] as String? ?? 'Not Available',
-      brand: json['brand'] as String? ?? 'Not Available',
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'] as String) : null,
-      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt'] as String) : null,
-    );
-  }
-}
+import 'dart:async';
 
 // Custom exceptions for API calls
 class NetworkException implements Exception {
@@ -78,12 +37,72 @@ class ServerErrorException implements Exception {
 
 class ApiService {
   static String? _token;
+  static String? _resolvedBaseUrl;
   
-  // Base URL pointing directly to the PC local network IP for physical device debugging
-  final String baseUrl = 'http://192.168.1.103:8080';
-  
-  // Timeout for requests - increased to 30 seconds
+  // Timeout for requests
   final Duration timeoutDuration = const Duration(seconds: 30);
+
+  // Helper method to automatically select correct backend URL based on platform
+  Future<String> getBaseUrl() async {
+    if (_resolvedBaseUrl != null) {
+      return _resolvedBaseUrl!;
+    }
+
+    if (kIsWeb) {
+      _resolvedBaseUrl = 'http://localhost:8080';
+      return _resolvedBaseUrl!;
+    }
+
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      _resolvedBaseUrl = 'http://localhost:8080';
+      return _resolvedBaseUrl!;
+    }
+
+    if (Platform.isAndroid) {
+      try {
+        // Try connecting to Android emulator loopback gateway
+        await http.get(Uri.parse('http://10.0.2.2:8080/api/test/db-info'))
+            .timeout(const Duration(milliseconds: 600));
+        _resolvedBaseUrl = 'http://10.0.2.2:8080';
+        return _resolvedBaseUrl!;
+      } catch (_) {}
+    }
+
+    // Try target IP 192.168.1.103 (User requested IP)
+    try {
+      await http.get(Uri.parse('http://192.168.1.103:8080/api/test/db-info'))
+          .timeout(const Duration(milliseconds: 600));
+      _resolvedBaseUrl = 'http://192.168.1.103:8080';
+      return _resolvedBaseUrl!;
+    } catch (_) {}
+
+    // Try target IP 192.168.1.105 (Verified active Wi-Fi IP fallback)
+    try {
+      await http.get(Uri.parse('http://192.168.1.105:8080/api/test/db-info'))
+          .timeout(const Duration(milliseconds: 600));
+      _resolvedBaseUrl = 'http://192.168.1.105:8080';
+      return _resolvedBaseUrl!;
+    } catch (_) {}
+
+    // Default fallback
+    _resolvedBaseUrl = 'http://192.168.1.103:8080';
+    return _resolvedBaseUrl!;
+  }
+
+  // Connection logging helper
+  void _logConnection({
+    required String baseUrl,
+    required String requestUrl,
+    required String responseStatus,
+    required String errorMessage,
+  }) {
+    debugPrint('================ CONNECTION LOG ================');
+    debugPrint('BASE URL: $baseUrl');
+    debugPrint('REQUEST URL: $requestUrl');
+    debugPrint('RESPONSE STATUS: $responseStatus');
+    debugPrint('ERROR MESSAGE: $errorMessage');
+    debugPrint('================================================');
+  }
 
   // Helper method to log requests, responses, and errors
   void _logRequest(String method, String url, {Map<String, String>? headers, String? body}) {
@@ -116,7 +135,8 @@ class ApiService {
 
   // Silent login with seeded admin credentials
   Future<bool> _login() async {
-    final url = '$baseUrl/api/auth/login';
+    final activeBaseUrl = await getBaseUrl();
+    final url = '$activeBaseUrl/api/auth/login';
     final requestBody = jsonEncode({
       'email': 'admin@inventory.com',
       'password': 'AdminPassword123!',
@@ -136,12 +156,38 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _token = data['token'] as String?;
+        _logConnection(
+          baseUrl: activeBaseUrl,
+          requestUrl: url,
+          responseStatus: '${response.statusCode} OK',
+          errorMessage: 'None',
+        );
         return _token != null;
       }
+
+      _logConnection(
+        baseUrl: activeBaseUrl,
+        requestUrl: url,
+        responseStatus: '${response.statusCode}',
+        errorMessage: 'Authentication failed: ${response.body}',
+      );
+      return false;
+    } on TimeoutException catch (e) {
+      _logConnection(
+        baseUrl: activeBaseUrl,
+        requestUrl: url,
+        responseStatus: 'TIMEOUT',
+        errorMessage: 'Silent authentication request timed out: ${e.message ?? "Future not completed"}',
+      );
       return false;
     } catch (e) {
       _logError('POST', url, e);
-      debugPrint('API Error - Silent Authentication failed: $e');
+      _logConnection(
+        baseUrl: activeBaseUrl,
+        requestUrl: url,
+        responseStatus: 'ERROR',
+        errorMessage: e.toString(),
+      );
       return false;
     }
   }
@@ -156,6 +202,8 @@ class ApiService {
 
   // Fetch product details by barcode
   Future<Product> getProductByBarcode(String barcode) async {
+    final activeBaseUrl = await getBaseUrl();
+    
     // 1. Silent login if token is missing
     if (_token == null) {
       debugPrint('API Info - Stored token is missing. Initiating silent login...');
@@ -165,7 +213,7 @@ class ApiService {
       }
     }
 
-    final url = '$baseUrl/api/products/barcode/$barcode';
+    final url = '$activeBaseUrl/api/products/barcode/$barcode';
 
     try {
       // 2. Perform barcode lookup request
@@ -193,10 +241,24 @@ class ApiService {
         }
       }
 
+      // Connection logging matching required format
+      _logConnection(
+        baseUrl: activeBaseUrl,
+        requestUrl: url,
+        responseStatus: '${response.statusCode}',
+        errorMessage: response.statusCode == 200 ? 'None' : 'Barcode query returned status code ${response.statusCode}',
+      );
+
+      // Print debug logs
+      debugPrint('SCANNED BARCODE: $barcode');
+      debugPrint('GET /api/products/barcode/$barcode');
+      debugPrint('HTTP STATUS: ${response.statusCode}');
+      debugPrint('RESPONSE BODY: ${response.body}');
+
       // 4. Handle status codes
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
-        return Product.fromJson(data);
+        return Product.fromBackendJson(data);
       } else if (response.statusCode == 404) {
         throw ProductNotFoundException('Product not found (404) for barcode: $barcode');
       } else if (response.statusCode == 401) {
@@ -206,14 +268,40 @@ class ApiService {
       } else {
         throw ServerErrorException('Request failed with status code ${response.statusCode}.');
       }
+    } on TimeoutException catch (e) {
+      _logConnection(
+        baseUrl: activeBaseUrl,
+        requestUrl: url,
+        responseStatus: 'TIMEOUT',
+        errorMessage: 'Request timed out: ${e.message ?? "Future not completed"}',
+      );
+      throw NetworkException('Connection timed out. Please check if your PC server is running and reachable at $activeBaseUrl.');
     } on SocketException catch (e) {
       _logError('GET', url, e);
-      throw NetworkException('Network unreachable. Please check your internet connection and verify if the backend is running at $baseUrl.');
+      _logConnection(
+        baseUrl: activeBaseUrl,
+        requestUrl: url,
+        responseStatus: 'SOCKET_ERROR',
+        errorMessage: e.toString(),
+      );
+      throw NetworkException('Network unreachable. Please check your internet connection and verify if the backend is running at $activeBaseUrl.');
     } on http.ClientException catch (e) {
       _logError('GET', url, e);
+      _logConnection(
+        baseUrl: activeBaseUrl,
+        requestUrl: url,
+        responseStatus: 'CLIENT_ERROR',
+        errorMessage: e.toString(),
+      );
       throw NetworkException('Network communication failed: ${e.message}');
     } catch (e) {
       _logError('GET', url, e);
+      _logConnection(
+        baseUrl: activeBaseUrl,
+        requestUrl: url,
+        responseStatus: 'UNEXPECTED_ERROR',
+        errorMessage: e.toString(),
+      );
       if (e is ProductNotFoundException || e is UnauthorizedException || e is ServerErrorException || e is NetworkException) {
         rethrow;
       }

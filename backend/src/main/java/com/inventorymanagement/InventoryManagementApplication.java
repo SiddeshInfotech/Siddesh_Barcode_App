@@ -51,20 +51,38 @@ public class InventoryManagementApplication {
             System.out.println("No .env file found at: " + envPath.toAbsolutePath());
         }
 
-        // Detect if the database password is missing or is a placeholder
-        String dbPassword = System.getProperty("SUPABASE_DB_PASSWORD");
-        if (dbPassword == null) {
-            dbPassword = System.getenv("SUPABASE_DB_PASSWORD");
+        // Test the database connection before letting JPA / Hibernate initialize
+        String url = System.getProperty("spring.datasource.url");
+        if (url == null) url = System.getenv("spring.datasource.url");
+        if (url == null) url = "jdbc:postgresql://aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres";
+
+        String user = System.getProperty("spring.datasource.username");
+        if (user == null) user = System.getenv("spring.datasource.username");
+        if (user == null) user = "postgres.rcdbqpmmtyioqxrzsdeg";
+
+        String pass = System.getProperty("spring.datasource.password");
+        if (pass == null) pass = System.getenv("spring.datasource.password");
+        if (pass == null) pass = "hAOZTxxIfDACay9B";
+
+        boolean connectionSuccessful = false;
+        if (url.startsWith("jdbc:postgresql://")) {
+            System.out.println("Testing database connection to " + url + " as user " + user + "...");
+            try {
+                Class.forName("org.postgresql.Driver");
+                java.sql.DriverManager.setLoginTimeout(3); // 3 seconds login timeout
+                try (java.sql.Connection conn = java.sql.DriverManager.getConnection(url, user, pass)) {
+                    connectionSuccessful = true;
+                    System.out.println("Database connection successful!");
+                }
+            } catch (Exception e) {
+                System.out.println("====================================================================");
+                System.out.println("WARNING: Database connection failed: " + e.getMessage());
+                System.out.println("Switching automatically to an in-memory H2 database for local development.");
+                System.out.println("====================================================================");
+            }
         }
-        if (dbPassword == null || dbPassword.trim().isEmpty() || 
-            "your_actual_database_password".equalsIgnoreCase(dbPassword.trim()) || 
-            "[YOUR-PASSWORD]".equals(dbPassword.trim())) {
-            
-            System.out.println("====================================================================");
-            System.out.println("WARNING: Supabase database password is not configured or is set to a placeholder.");
-            System.out.println("Switching automatically to an in-memory H2 database for local development.");
-            System.out.println("====================================================================");
-            
+
+        if (!connectionSuccessful) {
             System.setProperty("spring.datasource.url", "jdbc:h2:mem:inventorydb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL");
             System.setProperty("spring.datasource.username", "sa");
             System.setProperty("spring.datasource.password", "");

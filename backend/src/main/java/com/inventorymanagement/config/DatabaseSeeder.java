@@ -75,6 +75,24 @@ public class DatabaseSeeder implements CommandLineRunner {
             log.info("Seeded default admin user: {}", adminEmail);
         }
 
+        // Seed additional admin user
+        String siddeshAdminEmail = "SiddeshERP78@gmail.com";
+        if (userRepository.findByEmail(siddeshAdminEmail).isEmpty()) {
+            Role adminRole = roleRepository.findByName(RoleName.ROLE_ADMIN)
+                    .orElseThrow(() -> new IllegalStateException("Admin role not initialized"));
+
+            User siddeshAdmin = User.builder()
+                    .email(siddeshAdminEmail)
+                    .password(passwordEncoder.encode("SiddeshERP78@@!!##"))
+                    .enabled(true)
+                    .accountNonLocked(true)
+                    .roles(Set.of(adminRole))
+                    .build();
+
+            userRepository.save(siddeshAdmin);
+            log.info("Seeded default admin user: {}", siddeshAdminEmail);
+        }
+
         // Seed default manager user
         String managerEmail = "manager@inventory.com";
         if (userRepository.findByEmail(managerEmail).isEmpty()) {

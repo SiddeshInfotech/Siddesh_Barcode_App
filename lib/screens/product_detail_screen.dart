@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../models/product_model.dart';
 import '../services/api_service.dart';
 import 'product_not_found_screen.dart';
 

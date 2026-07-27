@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
-import '../services/product_lookup_service.dart';
+import '../services/api_service.dart';
 import '../widgets/scanner_overlay.dart';
 import 'inward_entry_screen.dart';
 import 'outward_entry_screen.dart';
@@ -36,6 +37,9 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
     ],
   );
 
+  final ApiService _apiService = ApiService();
+  final ImagePicker _picker = ImagePicker();
+
   bool _isScanning = true;
   bool _isProcessing = false;
   bool _isTorchOn = false;
@@ -52,6 +56,29 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
     setState(() {
       _isTorchOn = !_isTorchOn;
     });
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        final capture = await _scannerController.analyzeImage(image.path);
+        if (capture != null && capture.barcodes.isNotEmpty) {
+          final rawValue = capture.barcodes.first.rawValue;
+          if (rawValue != null && rawValue.isNotEmpty) {
+            _handleBarcodeDetected(rawValue);
+            return;
+          }
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No barcode found in image')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    }
   }
 
   Future<void> _handleBarcodeDetected(String barcode) async {
@@ -74,7 +101,17 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
 
     if (!mounted) return;
 
-    final product = await ProductLookupService.getProductByBarcode(barcode);
+    Product? product;
+    String? connectionError;
+    bool isNotFoundError = false;
+
+    try {
+      product = await _apiService.getProductByBarcode(barcode);
+    } on ProductNotFoundException {
+      isNotFoundError = true;
+    } catch (e) {
+      connectionError = e.toString();
+    }
 
     if (!mounted) return;
 
@@ -85,8 +122,10 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
 
     if (product != null) {
       _navigateToEntryScreen(product);
-    } else {
+    } else if (isNotFoundError) {
       _showProductNotFoundBottomSheet(barcode);
+    } else if (connectionError != null) {
+      _showConnectionErrorBottomSheet(connectionError);
     }
   }
 
@@ -104,6 +143,80 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
         ),
       );
     }
+  }
+
+  void _showConnectionErrorBottomSheet(String error) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFFF1F2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.error_outline_rounded,
+                  color: Color(0xFFF43F5E),
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Connection Failure',
+                style: AppTextStyles.sectionTitle,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Failed to query backend database:\n$error',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.cardSubtitle,
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        side: const BorderSide(color: AppColors.primary),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _resetScanner();
+                      },
+                      child: const Text(
+                        'Dismiss',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    ).then((_) => _resetScanner());
   }
 
   void _showProductNotFoundBottomSheet(String barcode) {
@@ -312,45 +425,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
             ),
           ),
 
-          // 4. Quick Demo Barcode Chips (Ensures instant 100% testability on emulators/desktop)
-          Positioned(
-            top: 100,
-            left: 16,
-            right: 16,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: [
-                  const Text(
-                    'Quick Test: ',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white70,
-                    ),
-                  ),
-                  _DemoBarcodeChip(
-                    label: '8901234567890 (Scanner X1)',
-                    onTap: () => _handleBarcodeDetected('8901234567890'),
-                  ),
-                  _DemoBarcodeChip(
-                    label: '123456789012 (Printer 400)',
-                    onTap: () => _handleBarcodeDetected('123456789012'),
-                  ),
-                  _DemoBarcodeChip(
-                    label: 'PROD-001 (Voyager)',
-                    onTap: () => _handleBarcodeDetected('PROD-001'),
-                  ),
-                  _DemoBarcodeChip(
-                    label: 'UNKNOWN-999',
-                    onTap: () => _handleBarcodeDetected('UNKNOWN-999'),
-                  ),
-                ],
-              ),
-            ),
-          ),
+
 
           // 5. Success Checkmark & Loading Overlay
           if (_showSuccessCheck || _isProcessing)
@@ -414,16 +489,12 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
                   _BottomControlButton(
                     icon: Icons.photo_library_outlined,
                     label: 'Gallery',
-                    onTap: () {
-                      _handleBarcodeDetected('8901234567890');
-                    },
+                    onTap: _pickImageFromGallery,
                   ),
 
                   // Center Trigger Scan Button
                   GestureDetector(
-                    onTap: () {
-                      _handleBarcodeDetected('123456789012');
-                    },
+                    onTap: _resetScanner,
                     child: Container(
                       width: 58,
                       height: 58,
@@ -495,33 +566,7 @@ class _AppBarSquareButton extends StatelessWidget {
   }
 }
 
-class _DemoBarcodeChip extends StatelessWidget {
-  const _DemoBarcodeChip({required this.label, required this.onTap});
 
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      child: ActionChip(
-        backgroundColor: AppColors.cardBg.withValues(alpha: 0.85),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        label: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        onPressed: onTap,
-      ),
-    );
-  }
-}
 
 class _BottomControlButton extends StatelessWidget {
   const _BottomControlButton({

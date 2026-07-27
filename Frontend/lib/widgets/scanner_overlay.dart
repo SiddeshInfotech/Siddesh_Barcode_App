@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 
 class ScannerOverlay extends StatelessWidget {
-  const ScannerOverlay({Key? key}) : super(key: key);
+  const ScannerOverlay({
+    Key? key,
+    this.scanWindowSize = const Size(260, 260),
+    this.isScanning = true,
+  }) : super(key: key);
+
+  final Size scanWindowSize;
+  final bool isScanning;
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size.square(260),
-      painter: _ScannerOverlayPainter(),
+    return Center(
+      child: CustomPaint(
+        size: scanWindowSize,
+        painter: _ScannerOverlayPainter(),
+      ),
     );
   }
 }
