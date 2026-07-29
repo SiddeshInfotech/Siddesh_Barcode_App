@@ -13,7 +13,18 @@ public class InventoryManagementApplication {
 
     public static void main(String[] args) {
         loadDotEnv();
-        SpringApplication.run(InventoryManagementApplication.class, args);
+        var context = SpringApplication.run(InventoryManagementApplication.class, args);
+        var env = context.getEnvironment();
+        String address = env.getProperty("server.address", "0.0.0.0");
+        String port = env.getProperty("server.port", "8080");
+
+        System.out.println("====================================================================");
+        System.out.println("SPRING BOOT BACKEND BOUND SUCCESSFULLY TO HOST INTERFACES");
+        System.out.println("1. ACTIVE BINDING ADDRESS : " + address + " (Listens on all network interfaces)");
+        System.out.println("2. ACTIVE LISTENING PORT  : " + port);
+        System.out.println("3. PC LAN IP ENDPOINT     : http://192.168.1.102:" + port + "/api/auth/login");
+        System.out.println("4. LOCALHOST ENDPOINT     : http://localhost:" + port + "/api/auth/login");
+        System.out.println("====================================================================");
     }
 
     private static void loadDotEnv() {

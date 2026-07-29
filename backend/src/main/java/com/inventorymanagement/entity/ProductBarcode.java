@@ -27,6 +27,10 @@ public class ProductBarcode {
     @Column(nullable = false, unique = true, length = 255)
     private String code;
 
+    @Column(name = "status", length = 50)
+    @Builder.Default
+    private String status = "GENERATED";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -34,6 +38,9 @@ public class ProductBarcode {
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (status == null || status.trim().isEmpty()) {
+            status = "GENERATED";
         }
     }
 }

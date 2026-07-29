@@ -46,9 +46,9 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(org.springframework.security.authentication.BadCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleBadCredentialsException(org.springframework.security.authentication.BadCredentialsException ex) {
-        log.warn("Authentication failed: invalid credentials");
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthenticationException(org.springframework.security.core.AuthenticationException ex) {
+        log.warn("Authentication failed: {}", ex.getMessage());
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
                 "Invalid email or password"
@@ -91,7 +91,7 @@ public class GlobalExceptionHandler {
         log.error("An unexpected error occurred: ", ex);
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "An internal server error occurred"
+                "An internal server error occurred: " + ex.getClass().getName() + " - " + ex.getMessage()
         );
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }

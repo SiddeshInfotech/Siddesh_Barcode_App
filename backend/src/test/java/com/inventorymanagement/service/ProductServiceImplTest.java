@@ -159,10 +159,13 @@ public class ProductServiceImplTest {
     }
 
     @Test
-    public void testGetProductByBarcode_NotFound_ThrowsException() {
+    public void testGetProductByBarcode_NotFound_AutoCreatesProduct() {
         when(productRepository.findByBarcodeIgnoreCase(anyString())).thenReturn(Optional.empty());
+        when(productBarcodeRepository.findByCodeIgnoreCase(anyString())).thenReturn(Optional.empty());
+        when(productRepository.save(any(Product.class))).thenReturn(product);
 
-        assertThrows(ResourceNotFoundException.class, () -> productService.getProductByBarcode("1234567890"));
+        ProductResponse response = productService.getProductByBarcode("1234567890");
+        assertNotNull(response);
     }
 
     @Test

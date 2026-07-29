@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Autowired;
+
 /**
  * Component to seed roles and sample user records in the database at startup.
  */
@@ -22,21 +24,23 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.inventorymanagement.repository.ProductRepository productRepository;
+    private final com.inventorymanagement.repository.ProductBarcodeRepository productBarcodeRepository;
 
-    /**
-     * Constructs a new DatabaseSeeder.
-     *
-     * @param userRepository   the UserRepository dependency
-     * @param roleRepository   the RoleRepository dependency
-     * @param passwordEncoder the PasswordEncoder to hash user passwords
-     */
+    @Autowired(required = false)
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     public DatabaseSeeder(
             UserRepository userRepository,
             RoleRepository roleRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            com.inventorymanagement.repository.ProductRepository productRepository,
+            com.inventorymanagement.repository.ProductBarcodeRepository productBarcodeRepository) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.productRepository = productRepository;
+        this.productBarcodeRepository = productBarcodeRepository;
     }
 
     @Override
@@ -44,6 +48,8 @@ public class DatabaseSeeder implements CommandLineRunner {
     public void run(String... args) throws Exception {
         seedRoles();
         seedUsers();
+        seedProducts();
+        createPostgresTrigger();
     }
 
     private void seedRoles() {
@@ -127,6 +133,74 @@ public class DatabaseSeeder implements CommandLineRunner {
 
             userRepository.save(sales);
             log.info("Seeded default sales user: {}", salesEmail);
+        }
+    }
+
+    private void seedProducts() {
+        String defaultBarcode = "ST00012345";
+        if (!productRepository.existsByBarcode(defaultBarcode)) {
+            com.inventorymanagement.entity.Product defaultProduct = com.inventorymanagement.entity.Product.builder()
+                    .name("Siddesh Sample Product")
+                    .description("Sample barcode product for testing scanner")
+                    .barcode(defaultBarcode)
+                    .price(new java.math.BigDecimal("199.99"))
+                    .quantity(50)
+                    .sku("SKU-ST-00012345")
+                    .category("General")
+                    .brand("SiddeshInfotech")
+                    .build();
+
+            com.inventorymanagement.entity.Product saved = productRepository.save(defaultProduct);
+            log.info("Seeded default product: {} with barcode: {}", saved.getName(), defaultBarcode);
+
+            java.util.UUID productUuid = new java.util.UUID(0L, saved.getId());
+            if (!productBarcodeRepository.existsByCode(defaultBarcode)) {
+                productBarcodeRepository.save(com.inventorymanagement.entity.ProductBarcode.builder()
+                        .productId(productUuid)
+                        .code(defaultBarcode)
+                        .build());
+                log.info("Seeded product_barcodes entry for: {}", defaultBarcode);
+            }
+        }
+    }
+
+    private void createPostgresTrigger() {
+        if (jdbcTemplate == null) return;
+        try {
+            log.info("Checking/Creating PostgreSQL trigger for automatic product_barcodes status updates...");
+            
+            jdbcTemplate.execute("""
+                CREATE OR REPLACE FUNCTION update_product_barcode_status_trigger_fn()
+                RETURNS TRIGGER AS $$
+                BEGIN
+                    IF NEW.barcode IS NOT NULL AND TRIM(NEW.barcode) <> '' THEN
+                        IF UPPER(TRIM(NEW.type)) = 'INWARD' THEN
+                            UPDATE public.product_barcodes 
+                            SET status = 'INWARDED' 
+                            WHERE LOWER(TRIM(code)) = LOWER(TRIM(NEW.barcode));
+                        ELSIF UPPER(TRIM(NEW.type)) = 'OUTWARD' THEN
+                            UPDATE public.product_barcodes 
+                            SET status = 'OUTWARDED' 
+                            WHERE LOWER(TRIM(code)) = LOWER(TRIM(NEW.barcode));
+                        END IF;
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql;
+            """);
+
+            jdbcTemplate.execute("DROP TRIGGER IF EXISTS trg_update_product_barcode_status ON stock_transactions;");
+
+            jdbcTemplate.execute("""
+                CREATE TRIGGER trg_update_product_barcode_status
+                AFTER INSERT ON stock_transactions
+                FOR EACH ROW
+                EXECUTE FUNCTION update_product_barcode_status_trigger_fn();
+            """);
+
+            log.info("PostgreSQL trigger trg_update_product_barcode_status installed successfully!");
+        } catch (Exception e) {
+            log.warn("PostgreSQL trigger creation skipped (non-PostgreSQL dialect or permission constraint): {}", e.getMessage());
         }
     }
 }

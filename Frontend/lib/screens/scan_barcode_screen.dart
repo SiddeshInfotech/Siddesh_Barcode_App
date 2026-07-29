@@ -5,7 +5,6 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/barcode_scanner_service.dart';
 import '../widgets/camera_view.dart';
 import '../widgets/scanner_overlay.dart';
-import '../widgets/laser_animation.dart';
 import '../widgets/bottom_controls.dart';
 
 class ScanBarcodeScreen extends StatefulWidget {
@@ -134,8 +133,10 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
                             child: Stack(
                               alignment: Alignment.center,
                               children: const [
-                                ScannerOverlay(),
-                                LaserAnimation(size: 260),
+                                ScannerOverlay(
+                                  scanWindowSize: Size(260, 260),
+                                  isScanning: true,
+                                ),
                               ],
                             ),
                           ),

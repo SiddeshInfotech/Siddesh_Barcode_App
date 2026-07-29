@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/api_service.dart';
 
 class BarcodeGeneratorScreen extends StatefulWidget {
   const BarcodeGeneratorScreen({super.key});
@@ -16,6 +17,7 @@ class BarcodeGeneratorScreen extends StatefulWidget {
 
 class _BarcodeGeneratorScreenState extends State<BarcodeGeneratorScreen> {
   static const String _barcodeValue = 'ST00012345';
+  final ApiService _apiService = ApiService();
 
   final GlobalKey _previewKey = GlobalKey();
   final List<Color> _palette = const [
@@ -38,6 +40,18 @@ class _BarcodeGeneratorScreenState extends State<BarcodeGeneratorScreen> {
 
     setState(() => _isSaving = true);
     try {
+      // Auto-register barcode to backend DB
+      try {
+        await _apiService.createProduct(
+          name: 'Generated Product ($_barcodeValue)',
+          barcode: _barcodeValue,
+          price: 199.99,
+          quantity: 50,
+          description: 'Auto-registered from Barcode Generator',
+        );
+      } catch (_) {
+        // Ignore if already exists in DB
+      }
       final boundary = _previewKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
         throw StateError('Barcode preview is not ready');

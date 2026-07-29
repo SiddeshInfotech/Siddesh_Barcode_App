@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_constants.dart';
+import '../services/api_service.dart';
 import '../widgets/dashboard_app_bar.dart';
 import '../widgets/floating_bottom_navigation.dart';
 import '../widgets/hero_stock_card.dart';
@@ -18,6 +19,10 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
+  final ApiService _apiService = ApiService();
+  DashboardStats _stats = const DashboardStats();
+  bool _isLoadingStats = true;
+
   late final AnimationController _animationController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1200),
@@ -61,13 +66,37 @@ class _DashboardScreenState extends State<DashboardScreen>
   int _selectedNavIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _loadDashboardStats();
+  }
+
+  Future<void> _loadDashboardStats() async {
+    try {
+      final stats = await _apiService.getDashboardStats();
+      if (mounted) {
+        setState(() {
+          _stats = stats;
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingStats = false;
+        });
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
   }
 
-  void _navigateTo(Widget page) {
-    Navigator.of(context).push(
+  void _navigateTo(Widget page) async {
+    await Navigator.of(context).push(
       PageRouteBuilder<void>(
         transitionDuration: AppDurations.route,
         reverseTransitionDuration: AppDurations.route,
@@ -90,6 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         },
       ),
     );
+    _loadDashboardStats();
   }
 
   void _openInwardScanner() {
@@ -152,8 +182,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       SlideTransition(
                         position: _heroSlideDown,
                         child: HeroStockCard(
-                          stockCount: '1246',
-                          percentage: '+ 12.5%',
+                          stockCount: _isLoadingStats ? '0' : '${_stats.currentStock}',
+                          percentage: '+ 0.0%',
                           onTap: () => _navigateTo(const ProductsHubScreen()),
                         ),
                       ),
@@ -168,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             Expanded(
                               child: StatisticCard(
                                 title: "Today's\nInward",
-                                value: '28',
+                                value: _isLoadingStats ? '0' : '${_stats.todayInward}',
                                 subtitle: 'Items',
                                 valueColor: AppColors.green,
                                 iconBgColor: AppColors.greenPastel,
@@ -183,7 +213,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             Expanded(
                               child: StatisticCard(
                                 title: "Today's\nOutward",
-                                value: '17',
+                                value: _isLoadingStats ? '0' : '${_stats.todayOutward}',
                                 subtitle: 'Items',
                                 valueColor: AppColors.orange,
                                 iconBgColor: AppColors.orangeIconBg,
@@ -198,7 +228,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             Expanded(
                               child: StatisticCard(
                                 title: "Low Stock\nItems",
-                                value: '12',
+                                value: _isLoadingStats ? '0' : '${_stats.lowStockItems}',
                                 subtitle: 'Items',
                                 valueColor: AppColors.red,
                                 iconBgColor: AppColors.redPastel,

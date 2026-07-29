@@ -25,6 +25,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
 /**
  * Main security configuration class orchestrating HTTP security filter chain, CORS rules, and method security.
  */
@@ -110,27 +114,22 @@ public class SecurityConfig {
      * @throws Exception if filter chain setup fails
      */
     @Bean
+    @Order(1)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
+            .httpBasic(AbstractHttpConfigurer::disable)
+            .formLogin(AbstractHttpConfigurer::disable)
             .exceptionHandling(exception -> exception
                 .authenticationEntryPoint(unauthorizedHandler)
                 .accessDeniedHandler(accessDeniedHandler)
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Allow public access to authentication endpoints
-                .requestMatchers("/api/auth/**").permitAll()
-                // Allow public access to OpenAPI / Swagger documentation
-                .requestMatchers(
-                    "/v3/api-docs/**",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/webjars/**"
-                ).permitAll()
-                // All other endpoints require authentication
-                .anyRequest().authenticated()
+                .requestMatchers("/api/auth/**", "/api/test/**").permitAll()
+                .requestMatchers("/api/**").authenticated()
+                .anyRequest().permitAll()
             );
 
         http.authenticationProvider(authenticationProvider());

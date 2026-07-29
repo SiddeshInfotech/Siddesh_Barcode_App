@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * REST controller class defining endpoints for product catalog operations.
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/products")
 @Tag(name = "Product Management", description = "Endpoints for managing inventory products")
@@ -133,6 +135,28 @@ public class ProductController {
             @PathVariable String barcode) {
         ProductResponse response = productService.getProductByBarcode(barcode);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Updates the status field of a specific barcode record in product_barcodes table (All authenticated roles).
+     *
+     * @param code   the unique barcode string
+     * @param status the target status value (default: SCANNED)
+     * @return a ResponseEntity containing the updated ProductBarcode entity
+     */
+    @PutMapping("/barcodes/{code}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STORE_MANAGER', 'SALES_EXECUTIVE')")
+    @Operation(summary = "Update barcode status", description = "Updates the status of only the exact barcode record in product_barcodes table.")
+    public ResponseEntity<com.inventorymanagement.entity.ProductBarcode> updateBarcodeStatus(
+            @Parameter(description = "Barcode code to update status for", required = true)
+            @PathVariable String code,
+            @RequestParam(defaultValue = "INWARDED") String status) {
+        log.info("[STEP 3] Controller entered: PUT /api/products/barcodes/{}/status?status={}", code, status);
+        com.inventorymanagement.entity.ProductBarcode updated = productService.updateBarcodeStatus(code, status);
+        if (updated != null) {
+            return ResponseEntity.ok(updated);
+        }
+        return ResponseEntity.notFound().build();
     }
 
     /**

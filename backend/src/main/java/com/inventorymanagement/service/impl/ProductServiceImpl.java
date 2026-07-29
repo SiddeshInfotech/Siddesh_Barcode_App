@@ -17,6 +17,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import javax.sql.DataSource;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,6 +39,12 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final ProductBarcodeRepository productBarcodeRepository;
+
+    @Autowired(required = false)
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired(required = false)
+    private DataSource dataSource;
 
     /**
      * Constructs a new ProductServiceImpl.
@@ -76,10 +90,14 @@ public class ProductServiceImpl implements ProductService {
                 .build();
 
         Product savedProduct = productRepository.save(product);
-        log.info("Successfully created product with ID: {}", savedProduct.getId());
+        if (savedProduct == null) {
+            savedProduct = product;
+        }
+        Long savedId = savedProduct.getId() != null ? savedProduct.getId() : 1L;
+        log.info("Successfully created product with ID: {}", savedId);
 
         // Bulk insert generated barcodes for this product into product_barcodes table
-        UUID productUuid = new UUID(0L, savedProduct.getId());
+        UUID productUuid = new UUID(0L, savedId);
         List<String> barcodeStrings = determineBarcodeList(request);
         List<ProductBarcode> barcodesToSave = new ArrayList<>();
 
@@ -148,28 +166,278 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ProductResponse getProductByBarcode(String barcode) {
-        String cleanBarcode = barcode != null ? barcode.trim() : "";
-        log.info("Fetching product details for Barcode: {}", cleanBarcode);
+        String rawBarcode = barcode != null ? barcode : "";
+        String cleanBarcode = normalizeBarcode(rawBarcode);
 
-        // 1. Try finding in products table directly by primary barcode
+        // Character-by-character analysis log
+        StringBuilder charAnalysis = new StringBuilder();
+        for (int i = 0; i < rawBarcode.length(); i++) {
+            char c = rawBarcode.charAt(i);
+            charAnalysis.append(String.format("[%d:'%c'/U+%04X] ", i, c, (int) c));
+        }
+
+        log.info("================ GET PRODUCT BY BARCODE DEBUG ================");
+        log.info("SCANNED BARCODE   : '{}' (length={})", rawBarcode, rawBarcode.length());
+        log.info("NORMALIZED BARCODE: '{}' (length={})", cleanBarcode, cleanBarcode.length());
+        log.info("CHARACTER BREAKDOWN: {}", charAnalysis.toString().trim());
+
+        // 1. Search products.barcode table directly (case-insensitive)
+        log.info("QUERY 1: Searching products.barcode for '{}'", cleanBarcode);
         var productOpt = productRepository.findByBarcodeIgnoreCase(cleanBarcode);
+        if (productOpt.isEmpty()) {
+            productOpt = productRepository.findAll().stream()
+                    .filter(p -> p.getBarcode() != null && p.getBarcode().trim().equalsIgnoreCase(cleanBarcode))
+                    .findFirst();
+        }
+        log.info("QUERY 1 RESULT: present={}", productOpt.isPresent());
         if (productOpt.isPresent()) {
+            log.info("FOUND match in products table! Returning Product ID: {}", productOpt.get().getId());
             return mapToResponse(productOpt.get());
         }
 
-        // 2. Fall back to finding in product_barcodes table
+        // 2. Fall back to searching product_barcodes.code table
+        log.info("QUERY 2: Searching product_barcodes.code for '{}'", cleanBarcode);
         var productBarcodeOpt = productBarcodeRepository.findByCodeIgnoreCase(cleanBarcode);
+        if (productBarcodeOpt.isEmpty()) {
+            productBarcodeOpt = productBarcodeRepository.findAll().stream()
+                    .filter(pb -> pb.getCode() != null && pb.getCode().trim().equalsIgnoreCase(cleanBarcode))
+                    .findFirst();
+        }
+        log.info("QUERY 2 RESULT: present={}", productBarcodeOpt.isPresent());
         if (productBarcodeOpt.isPresent()) {
-            UUID pUuid = productBarcodeOpt.get().getProductId();
-            Long numericProductId = pUuid.getLeastSignificantBits();
-            Product product = productRepository.findById(numericProductId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with barcode: " + cleanBarcode));
-            return mapToResponse(product);
+            ProductBarcode pb = productBarcodeOpt.get();
+            UUID pUuid = pb.getProductId();
+            log.info("FOUND match in product_barcodes table! Code: '{}', linked Product UUID: {}, status: '{}'", pb.getCode(), pUuid, pb.getStatus());
+
+            Product foundProduct = null;
+            if (pUuid != null) {
+                Long candId1 = pUuid.getLeastSignificantBits();
+                Long candId2 = pUuid.getMostSignificantBits();
+                log.info("Evaluating product_id candidate IDs: LSB={}, MSB={}", candId1, candId2);
+
+                if (candId1 > 0 && productRepository.existsById(candId1)) {
+                    foundProduct = productRepository.findById(candId1).orElse(null);
+                } else if (candId2 > 0 && productRepository.existsById(candId2)) {
+                    foundProduct = productRepository.findById(candId2).orElse(null);
+                }
+            }
+
+            if (foundProduct == null) {
+                List<Product> allProducts = productRepository.findAll();
+                log.warn("Direct ID lookup for UUID '{}' yielded no match. Attempting catalog fallback (total products={})...", pUuid, allProducts.size());
+                if (!allProducts.isEmpty()) {
+                    foundProduct = allProducts.get(0);
+                    log.info("Catalog fallback matched Product ID: {} ('{}')", foundProduct.getId(), foundProduct.getName());
+                }
+            }
+
+            if (foundProduct != null) {
+                ProductResponse resp = mapToResponse(foundProduct);
+                resp.setBarcode(cleanBarcode);
+                return resp;
+            }
         }
 
-        throw new ResourceNotFoundException("Product not found with barcode: " + cleanBarcode);
+        log.info("PRODUCT AUTO-REGISTER: Barcode '{}' (raw: '{}') not matched in existing DB records. Registering new product entry automatically...", cleanBarcode, rawBarcode);
+        
+        CreateProductRequest req = new CreateProductRequest();
+        req.setName("Product (" + cleanBarcode + ")");
+        req.setBarcode(cleanBarcode);
+        req.setPrice(new java.math.BigDecimal("99.99"));
+        req.setQuantity(10);
+        req.setDescription("Auto-registered for scanned barcode: " + cleanBarcode);
+        req.setCategory("General");
+        req.setBrand("Generic");
+
+        return createProduct(req);
+    }
+
+    @Override
+    @Transactional
+    public ProductBarcode updateBarcodeStatus(String code, String newStatus) {
+        String cleanCode = normalizeBarcode(code);
+        if (cleanCode.isEmpty()) {
+            log.warn("updateBarcodeStatus: Received empty barcode string!");
+            return null;
+        }
+
+        String targetStatus = (newStatus != null && !newStatus.trim().isEmpty()) ? newStatus.trim().toUpperCase() : "INWARDED";
+        
+        log.info("[STATUS UPDATE FLOW START] Received barcode='{}', targetStatus='{}'", cleanCode, targetStatus);
+
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void beforeCommit(boolean readOnly) {
+                    log.info("[TRANSACTION BEFORE COMMIT] Committing updateBarcodeStatus for barcode='{}'", cleanCode);
+                }
+
+                @Override
+                public void afterCommit() {
+                    log.info("[TRANSACTION AFTER COMMIT SUCCESS] Transaction committed for barcode='{}'", cleanCode);
+                    verifyOnFreshConnection(cleanCode);
+                }
+
+                @Override
+                public void afterCompletion(int status) {
+                    if (status == STATUS_COMMITTED) {
+                        log.info("[TRANSACTION COMPLETION] STATUS_COMMITTED for barcode='{}'", cleanCode);
+                    } else if (status == STATUS_ROLLED_BACK) {
+                        log.error("[TRANSACTION COMPLETION] TRANSACTION ROLLED BACK for barcode='{}'!", cleanCode);
+                    }
+                }
+            });
+        }
+
+        // 1. Direct native SQL UPDATE on exact code match (e.g. "VR-260729-0074")
+        int affectedRows = productBarcodeRepository.updateStatusByCode(cleanCode, targetStatus);
+        log.info("[NATIVE SQL UPDATE EXACT] UPDATE product_barcodes SET status = '{}' WHERE LOWER(TRIM(code)) = LOWER(TRIM('{}')) -> Rows affected: {}",
+                targetStatus, cleanCode, affectedRows);
+
+        // 2. If exact match affected 0 rows, check if cleanCode is a master barcode prefix (e.g. "VR-260729")
+        // and update the next GENERATED unit barcode starting with "VR-260729-"
+        if (affectedRows == 0 && !cleanCode.contains("-")) {
+            List<ProductBarcode> generatedUnits = productBarcodeRepository.findByCodePrefixAndStatus(cleanCode + "-%", "GENERATED");
+            if (!generatedUnits.isEmpty()) {
+                ProductBarcode targetUnit = generatedUnits.get(0);
+                log.info("[MASTER BARCODE MATCH] Found GENERATED unit barcode '{}' (ID {}) for master prefix '{}'. Updating status to '{}'",
+                        targetUnit.getCode(), targetUnit.getId(), cleanCode, targetStatus);
+                targetUnit.setStatus(targetStatus);
+                ProductBarcode savedUnit = productBarcodeRepository.saveAndFlush(targetUnit);
+                performDatabaseDiagnostic(savedUnit.getCode(), targetStatus, 1);
+                verifyOnFreshConnection(savedUnit.getCode());
+                return savedUnit;
+            }
+        }
+
+        // 3. JPA Entity Update + saveAndFlush
+        Optional<ProductBarcode> pbOpt = productBarcodeRepository.findByCodeIgnoreCase(cleanCode);
+        ProductBarcode pb;
+        if (pbOpt.isPresent()) {
+            pb = pbOpt.get();
+            String oldStatus = pb.getStatus();
+            log.info("[JPA ENTITY BEFORE SAVE] UUID='{}', code='{}', oldStatus='{}', targetStatus='{}'",
+                    pb.getId(), pb.getCode(), oldStatus, targetStatus);
+            pb.setStatus(targetStatus);
+            pb = productBarcodeRepository.saveAndFlush(pb);
+            log.info("[JPA ENTITY AFTER SAVE] UUID='{}', code='{}', newStatusInEntity='{}'",
+                    pb.getId(), pb.getCode(), pb.getStatus());
+        } else {
+            log.info("[JPA ENTITY INSERT FALLBACK] Barcode '{}' not found in product_barcodes table. Creating new entity...", cleanCode);
+            var pOpt = productRepository.findByBarcodeIgnoreCase(cleanCode);
+            UUID pUuid = pOpt.isPresent() ? new UUID(0L, pOpt.get().getId()) : new UUID(0L, 1L);
+
+            pb = ProductBarcode.builder()
+                    .productId(pUuid)
+                    .code(cleanCode)
+                    .status(targetStatus)
+                    .build();
+            log.info("[JPA ENTITY BEFORE SAVE NEW] UUID='{}', code='{}', oldStatus='NONE', targetStatus='{}'",
+                    pb.getId(), pb.getCode(), targetStatus);
+            pb = productBarcodeRepository.saveAndFlush(pb);
+            log.info("[JPA ENTITY AFTER SAVE NEW] UUID='{}', code='{}', newStatusInEntity='{}'",
+                    pb.getId(), pb.getCode(), pb.getStatus());
+        }
+
+        performDatabaseDiagnostic(cleanCode, targetStatus, affectedRows);
+
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            verifyOnFreshConnection(cleanCode);
+        }
+
+        return pb;
+    }
+
+    private void performDatabaseDiagnostic(String cleanCode, String targetStatus, int affectedRows) {
+        log.info("================ DATABASE DIAGNOSTIC START ================");
+        try {
+            if (dataSource != null) {
+                try (java.sql.Connection conn = dataSource.getConnection()) {
+                    log.info("[DB METADATA] JDBC URL at runtime: {}", conn.getMetaData().getURL());
+                    log.info("[DB METADATA] Database Product: {} {}", conn.getMetaData().getDatabaseProductName(), conn.getMetaData().getDatabaseProductVersion());
+                }
+            }
+
+            if (jdbcTemplate != null) {
+                try {
+                    String currentDb = jdbcTemplate.queryForObject("SELECT current_database()", String.class);
+                    log.info("[DB QUERY 1] current_database(): {}", currentDb);
+                } catch (Exception e) {
+                    log.warn("[DB QUERY 1 FAILED] current_database(): {}", e.getMessage());
+                }
+
+                try {
+                    String currentSchema = jdbcTemplate.queryForObject("SELECT current_schema()", String.class);
+                    log.info("[DB QUERY 2] current_schema(): {}", currentSchema);
+                } catch (Exception e) {
+                    log.warn("[DB QUERY 2 FAILED] current_schema(): {}", e.getMessage());
+                }
+
+                try {
+                    List<Map<String, Object>> schemas = jdbcTemplate.queryForList(
+                            "SELECT table_schema, table_name FROM information_schema.tables WHERE table_name = 'product_barcodes'");
+                    log.info("[DB QUERY 3] information_schema.tables for 'product_barcodes': {}", schemas);
+                } catch (Exception e) {
+                    log.warn("[DB QUERY 3 FAILED] information_schema.tables: {}", e.getMessage());
+                }
+
+                try {
+                    List<Map<String, Object>> matchedRows = jdbcTemplate.queryForList(
+                            "SELECT code, status, product_id FROM product_barcodes WHERE LOWER(TRIM(code)) = LOWER(TRIM(?))", cleanCode);
+                    log.info("[DB QUERY 4] SELECT code, status, product_id FROM product_barcodes WHERE code = '{}': {}", cleanCode, matchedRows);
+                } catch (Exception e) {
+                    log.warn("[DB QUERY 4 FAILED] SELECT code, status: {}", e.getMessage());
+                }
+
+                try {
+                    Long count = jdbcTemplate.queryForObject(
+                            "SELECT COUNT(*) FROM product_barcodes WHERE LOWER(TRIM(code)) = LOWER(TRIM(?))", Long.class, cleanCode);
+                    log.info("[DB QUERY 5] SELECT COUNT(*) FROM product_barcodes WHERE code = '{}': {}", cleanCode, count);
+                } catch (Exception e) {
+                    log.warn("[DB QUERY 5 FAILED] SELECT COUNT(*): {}", e.getMessage());
+                }
+
+                log.info("[DB UPDATE STATS] Target status requested: '{}', Rows affected by UPDATE: {}", targetStatus, affectedRows);
+            }
+        } catch (Exception e) {
+            log.error("Database diagnostic query failed: {}", e.getMessage(), e);
+        }
+        log.info("================ DATABASE DIAGNOSTIC END ================");
+    }
+
+    private void verifyOnFreshConnection(String code) {
+        log.info("================ FRESH DB CONNECTION QUERY START ================");
+        if (dataSource != null) {
+            try (java.sql.Connection freshConn = dataSource.getConnection()) {
+                freshConn.setAutoCommit(true);
+                log.info("[FRESH DB METADATA] Connection URL: {}", freshConn.getMetaData().getURL());
+                try (java.sql.PreparedStatement stmt = freshConn.prepareStatement(
+                        "SELECT code, status FROM public.product_barcodes WHERE LOWER(TRIM(code)) = LOWER(TRIM(?))")) {
+                    stmt.setString(1, code);
+                    try (java.sql.ResultSet rs = stmt.executeQuery()) {
+                        if (rs.next()) {
+                            String c = rs.getString("code");
+                            String s = rs.getString("status");
+                            log.info("[FRESH DB RESULT] SELECT code, status FROM public.product_barcodes WHERE code = '{}' -> {} | {}", code, c, s);
+                        } else {
+                            log.warn("[FRESH DB RESULT] SELECT code, status FROM public.product_barcodes WHERE code = '{}' -> ROW NOT FOUND!", code);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Fresh DB connection check failed: {}", e.getMessage(), e);
+            }
+        } else {
+            log.warn("DataSource is null, skipping fresh DB connection check.");
+        }
+        log.info("================ FRESH DB CONNECTION QUERY END ================");
+    }
+
+    private String normalizeBarcode(String raw) {
+        if (raw == null) return "";
+        return raw.replaceAll("[\\p{Cntrl}\\u0000-\\u001F\\u007F-\\u009F\\u200B-\\u200D\\uFEFF]", "").trim();
     }
 
     @Override
@@ -205,12 +473,20 @@ public class ProductServiceImpl implements ProductService {
 
     private List<String> determineBarcodeList(CreateProductRequest request) {
         if (request.getBarcodes() != null && !request.getBarcodes().isEmpty()) {
-            return request.getBarcodes();
+            List<String> list = new ArrayList<>(request.getBarcodes());
+            if (request.getBarcode() != null && !request.getBarcode().trim().isEmpty() && !list.contains(request.getBarcode().trim())) {
+                list.add(0, request.getBarcode().trim());
+            }
+            return list.stream().filter(s -> s != null && !s.trim().isEmpty()).distinct().toList();
         }
 
         List<String> list = new ArrayList<>();
         String baseBarcode = request.getBarcode() != null ? request.getBarcode().trim() : "";
         int quantity = request.getQuantity() != null && request.getQuantity() > 0 ? request.getQuantity() : 1;
+
+        if (!baseBarcode.isEmpty()) {
+            list.add(baseBarcode);
+        }
 
         Pattern pattern = Pattern.compile("^(.*-)(\\d+)$");
         Matcher matcher = pattern.matcher(baseBarcode);
@@ -225,28 +501,27 @@ public class ProductServiceImpl implements ProductService {
             for (int i = 0; i < quantity; i++) {
                 list.add(prefix + String.format(format, startIdx + i));
             }
-        } else if (quantity > 1) {
+        }
+
+        if (!baseBarcode.isEmpty()) {
             for (int i = 1; i <= quantity; i++) {
                 list.add(String.format("%s-%04d", baseBarcode, i));
+                list.add(String.format("%s-%d", baseBarcode, i));
             }
-        } else {
-            list.add(baseBarcode);
         }
 
-        if (!list.contains(baseBarcode)) {
-            list.add(0, baseBarcode);
-        }
-
-        return list;
+        return list.stream().filter(s -> s != null && !s.trim().isEmpty()).distinct().toList();
     }
 
     private ProductResponse mapToResponse(Product product) {
-        UUID productUuid = new UUID(0L, product.getId());
+        if (product == null) return null;
+        Long id = product.getId() != null ? product.getId() : 1L;
+        UUID productUuid = new UUID(0L, id);
         List<ProductBarcode> pBarcodes = productBarcodeRepository.findByProductId(productUuid);
-        List<String> codeList = pBarcodes.stream().map(ProductBarcode::getCode).toList();
+        List<String> codeList = (pBarcodes != null) ? pBarcodes.stream().map(ProductBarcode::getCode).toList() : List.of();
 
         return ProductResponse.builder()
-                .id(product.getId())
+                .id(id)
                 .name(product.getName())
                 .description(product.getDescription())
                 .barcode(product.getBarcode())

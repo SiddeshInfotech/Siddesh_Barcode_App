@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
 import '../services/api_service.dart';
 
-class InwardEntryScreen extends StatefulWidget {
-  const InwardEntryScreen({
+class OutwardEntryScreen extends StatefulWidget {
+  const OutwardEntryScreen({
     super.key,
     this.product,
     this.scannedBarcode,
@@ -14,10 +15,10 @@ class InwardEntryScreen extends StatefulWidget {
   final String? scannedBarcode;
 
   @override
-  State<InwardEntryScreen> createState() => _InwardEntryScreenState();
+  State<OutwardEntryScreen> createState() => _OutwardEntryScreenState();
 }
 
-class _InwardEntryScreenState extends State<InwardEntryScreen> {
+class _OutwardEntryScreenState extends State<OutwardEntryScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late Product _activeProduct;
@@ -42,7 +43,7 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
   }
 
   @override
-  void didUpdateWidget(InwardEntryScreen oldWidget) {
+  void didUpdateWidget(OutwardEntryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.product != oldWidget.product && widget.product != null) {
       setState(() {
@@ -52,57 +53,54 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
   }
 
   int _quantity = 1;
+  late final TextEditingController _schoolNameController = TextEditingController(
+    text: 'St. Xavier International School',
+  );
+  late final TextEditingController _contactPersonController = TextEditingController(
+    text: 'Dr. Ramesh Kumar',
+  );
+  late final TextEditingController _mobileController = TextEditingController(
+    text: '+91 98765 43210',
+  );
   late final TextEditingController _invoiceNoController = TextEditingController(
-    text: 'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+    text: 'OUT-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
   );
-  late final TextEditingController _purchaseOrderController = TextEditingController(
-    text: 'PO-2026-9021',
+  late final TextEditingController _deliveredByController = TextEditingController(
+    text: 'Siddesh Logistics Team',
   );
-  late final TextEditingController _receivedByController = TextEditingController(
-    text: 'Siddesh (Warehouse Mgr)',
+  late final TextEditingController _receiverNameController = TextEditingController(
+    text: 'Ramesh Kumar',
   );
 
-  DateTime _invoiceDate = DateTime.now();
-  String? _uploadedFileName;
+  String _outwardType = 'School Dispatch';
+  bool _hasSigned = true;
   bool _isSaving = false;
 
   @override
   void dispose() {
+    _schoolNameController.dispose();
+    _contactPersonController.dispose();
+    _mobileController.dispose();
     _invoiceNoController.dispose();
-    _purchaseOrderController.dispose();
-    _receivedByController.dispose();
+    _deliveredByController.dispose();
+    _receiverNameController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectInvoiceDate(BuildContext context) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _invoiceDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primary,
-              onPrimary: Colors.white,
-              surface: AppColors.cardBg,
-              onSurface: AppColors.textPrimary,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _invoiceDate) {
-      setState(() {
-        _invoiceDate = picked;
-      });
-    }
-  }
-
-  void _saveInwardEntry() async {
+  void _saveOutwardEntry() async {
     if (_formKey.currentState?.validate() ?? false) {
+      if (_quantity > _activeProduct.availableStock) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Cannot dispatch $_quantity items. Available stock is only ${_activeProduct.availableStock}.',
+            ),
+            backgroundColor: AppColors.red,
+          ),
+        );
+        return;
+      }
+
       setState(() {
         _isSaving = true;
       });
@@ -112,26 +110,26 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
           : _activeProduct.barcode;
       final intId = int.tryParse(_activeProduct.id);
 
-      debugPrint('================ INWARD ENTRY FLOW DEBUG ================');
+      debugPrint('================ OUTWARD ENTRY FLOW DEBUG ================');
       debugPrint('[STEP 1] Scanned barcode received: "$targetBarcode"');
-      debugPrint('[STEP 2] Barcode sent from Flutter: "$targetBarcode" (Sending POST to /api/dashboard/inward & PUT to /api/products/barcodes/$targetBarcode/status?status=INWARDED)');
+      debugPrint('[STEP 2] Barcode sent from Flutter: "$targetBarcode" (Sending POST to /api/dashboard/outward & PUT to /api/products/barcodes/$targetBarcode/status?status=OUTWARDED)');
       debugPrint('Product Name: ${_activeProduct.name}');
       debugPrint('Quantity: $_quantity');
       debugPrint('Product ID: $intId');
       debugPrint('======================================================');
 
       try {
-        await ApiService().recordInward(
+        await ApiService().recordOutward(
           barcode: targetBarcode,
           quantity: _quantity,
           productId: intId,
         );
         await ApiService().updateBarcodeStatus(
           targetBarcode,
-          status: 'INWARDED',
+          status: 'OUTWARDED',
         );
       } catch (e) {
-        debugPrint('ERROR SAVING INWARD ENTRY: $e');
+        debugPrint('Error saving outward entry: $e');
       }
 
       if (!mounted) return;
@@ -157,23 +155,23 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
                   width: 72,
                   height: 72,
                   decoration: const BoxDecoration(
-                    color: AppColors.greenPastel,
+                    color: AppColors.orangeIconBg,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.check_rounded,
-                    color: AppColors.green,
+                    color: AppColors.orange,
                     size: 44,
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Inward Entry Saved!',
+                  'Outward Entry Saved!',
                   style: AppTextStyles.sectionTitle,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Added $_quantity item(s) to ${_activeProduct.name}.\nUpdated stock will be ${_activeProduct.currentStock + _quantity}.',
+                  'Dispatched $_quantity item(s) to ${_schoolNameController.text}.\nRemaining stock will be ${_activeProduct.currentStock - _quantity}.',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.cardSubtitle,
                 ),
@@ -182,7 +180,7 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.green,
+                      backgroundColor: AppColors.orange,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -221,7 +219,7 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Inward Entry Form', style: AppTextStyles.sectionTitle),
+        title: const Text('Outward Entry Form', style: AppTextStyles.sectionTitle),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -234,165 +232,110 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Product Summary Header Card (Auto Filled)
-                _ProductHeaderCard(product: _activeProduct, badgeColor: AppColors.green, modeLabel: 'INWARD'),
+                _ProductOutwardHeaderCard(product: _activeProduct),
                 const SizedBox(height: 20),
 
                 // Form Section Header
-                const Text('Entry Details', style: AppTextStyles.sectionTitle),
+                const Text('Dispatch Details', style: AppTextStyles.sectionTitle),
                 const SizedBox(height: 14),
 
-                // Auto-filled Supplier Field
-                _ReadonlyField(
-                  label: 'Supplier',
-                  value: _activeProduct.supplier,
-                  icon: Icons.business_rounded,
-                ),
-                const SizedBox(height: 14),
-
-                // Quantity Editable Stepper & Input
+                // Quantity Stepper (Validated against available stock)
                 _buildQuantityStepper(),
                 const SizedBox(height: 14),
 
-                // Invoice Number Field
+                // School Name / Institution
+                _buildTextField(
+                  controller: _schoolNameController,
+                  label: 'School / Institution Name',
+                  icon: Icons.school_rounded,
+                  validator: (v) => v == null || v.isEmpty ? 'Please enter recipient name' : null,
+                ),
+                const SizedBox(height: 14),
+
+                // Contact Person & Mobile Number Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _contactPersonController,
+                        label: 'Contact Person',
+                        icon: Icons.person_outline_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _mobileController,
+                        label: 'Mobile Number',
+                        icon: Icons.phone_android_rounded,
+                        keyboardType: TextInputType.phone,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Invoice Number
                 _buildTextField(
                   controller: _invoiceNoController,
-                  label: 'Invoice Number',
-                  icon: Icons.receipt_long_rounded,
-                  validator: (v) => v == null || v.isEmpty ? 'Please enter invoice number' : null,
+                  label: 'Dispatch Invoice Number',
+                  icon: Icons.receipt_rounded,
                 ),
                 const SizedBox(height: 14),
 
-                // Invoice Date Picker Field
-                InkWell(
-                  onTap: () => _selectInvoiceDate(context),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: AppShadows.soft,
+                // Outward Type Selector
+                _buildOutwardTypeSelector(),
+                const SizedBox(height: 14),
+
+                // Delivered By & Receiver Name Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _deliveredByController,
+                        label: 'Delivered By',
+                        icon: Icons.local_shipping_outlined,
+                      ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today_rounded, color: AppColors.primary, size: 20),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Invoice Date', style: AppTextStyles.statTitle),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${_invoiceDate.day}/${_invoiceDate.month}/${_invoiceDate.year}',
-                                  style: AppTextStyles.cardTitle,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const Icon(Icons.edit_calendar_rounded, color: AppColors.primary, size: 20),
-                      ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _receiverNameController,
+                        label: 'Receiver Name',
+                        icon: Icons.badge_outlined,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 14),
 
-                // Purchase Order Field
-                _buildTextField(
-                  controller: _purchaseOrderController,
-                  label: 'Purchase Order (PO)',
-                  icon: Icons.assignment_rounded,
-                ),
-                const SizedBox(height: 14),
-
-                // Received By Field
-                _buildTextField(
-                  controller: _receivedByController,
-                  label: 'Received By',
-                  icon: Icons.person_outline_rounded,
-                ),
-                const SizedBox(height: 14),
-
-                // Upload Invoice File Button
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                    boxShadow: AppShadows.soft,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: const BoxDecoration(
-                          color: AppColors.mintPastel,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.upload_file_rounded, color: AppColors.green, size: 24),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Invoice Document', style: AppTextStyles.cardTitle),
-                            const SizedBox(height: 2),
-                            Text(
-                              _uploadedFileName ?? 'PDF, PNG or JPG (Max 5MB)',
-                              style: AppTextStyles.cardSubtitle,
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _uploadedFileName = 'Invoice_${_invoiceNoController.text}.pdf';
-                          });
-                        },
-                        child: Text(
-                          _uploadedFileName == null ? 'Upload' : 'Change',
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // Digital Signature Field Widget
+                _buildSignatureCard(),
                 const SizedBox(height: 28),
 
-                // Submit Save Inward Button
+                // Submit Save Outward Button
                 SizedBox(
                   width: double.infinity,
                   height: 54,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.green,
+                      backgroundColor: AppColors.orange,
                       elevation: 4,
-                      shadowColor: AppColors.green.withValues(alpha: 0.3),
+                      shadowColor: AppColors.orange.withValues(alpha: 0.3),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
                       ),
                     ),
-                    onPressed: _isSaving ? null : _saveInwardEntry,
+                    onPressed: _isSaving ? null : _saveOutwardEntry,
                     child: _isSaving
                         ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 3)
                         : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.save_rounded, color: Colors.white, size: 22),
+                              Icon(Icons.drive_file_move_rounded, color: Colors.white, size: 22),
                               SizedBox(width: 8),
                               Text(
-                                'Save Inward Entry',
+                                'Save Outward Entry',
                                 style: TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 16,
@@ -423,12 +366,20 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Inward Quantity', style: AppTextStyles.statTitle),
-              SizedBox(height: 2),
-              Text('Units to add', style: AppTextStyles.cardSubtitle),
+              const Text('Outward Quantity', style: AppTextStyles.statTitle),
+              const SizedBox(height: 2),
+              Text(
+                'Available: ${_activeProduct.availableStock} items',
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.orange,
+                ),
+              ),
             ],
           ),
           Row(
@@ -457,11 +408,143 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
               ),
               _StepperButton(
                 icon: Icons.add_rounded,
-                onTap: () {
+                onTap: _quantity < _activeProduct.availableStock
+                    ? () {
+                        setState(() {
+                          _quantity++;
+                        });
+                      }
+                    : null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOutwardTypeSelector() {
+    final types = ['School Dispatch', 'Direct Sale', 'Internal Transfer', 'Sample'];
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppShadows.soft,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Outward Dispatch Type', style: AppTextStyles.statTitle),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: types.map((type) {
+              final isSelected = _outwardType == type;
+              return ChoiceChip(
+                label: Text(
+                  type,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? Colors.white : AppColors.textPrimary,
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: AppColors.orange,
+                backgroundColor: AppColors.orangeIconBg.withValues(alpha: 0.5),
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _outwardType = type;
+                    });
+                  }
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignatureCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppShadows.soft,
+        border: Border.all(
+          color: _hasSigned
+              ? AppColors.green.withValues(alpha: 0.5)
+              : AppColors.textSecondary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.draw_rounded, color: AppColors.orange, size: 20),
+                  SizedBox(width: 8),
+                  Text('Receiver Digital Signature', style: AppTextStyles.cardTitle),
+                ],
+              ),
+              if (_hasSigned)
+                const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Mock Digital Signature Pad Canvas Frame
+          Container(
+            height: 90,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.textSecondary.withValues(alpha: 0.15)),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (_hasSigned)
+                  CustomPaint(
+                    size: const Size(double.infinity, 90),
+                    painter: _SignatureSamplePainter(),
+                  )
+                else
+                  const Text(
+                    'Sign here with finger',
+                    style: AppTextStyles.cardSubtitle,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () {
                   setState(() {
-                    _quantity++;
+                    _hasSigned = !_hasSigned;
                   });
                 },
+                child: Text(
+                  _hasSigned ? 'Clear Signature' : 'Sign Now',
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.orange,
+                  ),
+                ),
               ),
             ],
           ),
@@ -474,6 +557,7 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
     required TextEditingController controller,
     required String label,
     required IconData icon,
+    TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
     return Container(
@@ -485,16 +569,17 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
       child: TextFormField(
         controller: controller,
         validator: validator,
+        keyboardType: keyboardType,
         style: const TextStyle(
           fontFamily: 'Poppins',
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: AppTextStyles.statTitle,
-          prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+          prefixIcon: Icon(icon, color: AppColors.orange, size: 20),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
@@ -503,16 +588,10 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
   }
 }
 
-class _ProductHeaderCard extends StatelessWidget {
-  const _ProductHeaderCard({
-    required this.product,
-    required this.badgeColor,
-    required this.modeLabel,
-  });
+class _ProductOutwardHeaderCard extends StatelessWidget {
+  const _ProductOutwardHeaderCard({required this.product});
 
   final Product product;
-  final Color badgeColor;
-  final String modeLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -522,16 +601,15 @@ class _ProductHeaderCard extends StatelessWidget {
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(AppRadii.card),
         boxShadow: AppShadows.soft,
-        border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.orange.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          // Product Image / Placeholder
           Container(
             width: 74,
             height: 74,
             decoration: BoxDecoration(
-              color: AppColors.bluePastel,
+              color: AppColors.orangePastel,
               borderRadius: BorderRadius.circular(18),
             ),
             child: ClipRRect(
@@ -540,14 +618,12 @@ class _ProductHeaderCard extends StatelessWidget {
                 product.imageUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) {
-                  return Icon(Icons.inventory_2_rounded, size: 36, color: badgeColor);
+                  return const Icon(Icons.inventory_2_rounded, size: 36, color: AppColors.orange);
                 },
               ),
             ),
           ),
           const SizedBox(width: 14),
-
-          // Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -558,26 +634,26 @@ class _ProductHeaderCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: badgeColor.withValues(alpha: 0.15),
+                        color: AppColors.orange.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        modeLabel,
+                      child: const Text(
+                        'OUTWARD',
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
-                          color: badgeColor,
+                          color: AppColors.orange,
                         ),
                       ),
                     ),
                     Text(
-                      'Stock: ${product.currentStock}',
+                      'Avail: ${product.availableStock}',
                       style: const TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: AppColors.orange,
                       ),
                     ),
                   ],
@@ -590,54 +666,10 @@ class _ProductHeaderCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'Barcode: ${product.barcode}',
-                  style: AppTextStyles.cardSubtitle,
-                ),
-                Text(
-                  'Brand: ${product.brand} | ${product.category}',
-                  style: AppTextStyles.cardSubtitle,
-                ),
+                Text('Barcode: ${product.barcode}', style: AppTextStyles.cardSubtitle),
+                Text('Brand: ${product.brand} | Model: ${product.model}', style: AppTextStyles.cardSubtitle),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReadonlyField extends StatelessWidget {
-  const _ReadonlyField({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppShadows.soft,
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 20),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: AppTextStyles.statTitle),
-              const SizedBox(height: 2),
-              Text(value, style: AppTextStyles.cardTitle),
-            ],
           ),
         ],
       ),
@@ -664,18 +696,39 @@ class _StepperButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: onTap == null
                 ? AppColors.textSecondary.withValues(alpha: 0.1)
-                : AppColors.primary.withValues(alpha: 0.12),
+                : AppColors.orange.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
             icon,
             color: onTap == null
                 ? AppColors.textSecondary.withValues(alpha: 0.4)
-                : AppColors.primary,
+                : AppColors.orange,
             size: 20,
           ),
         ),
       ),
     );
   }
+}
+
+class _SignatureSamplePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.textPrimary
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path()
+      ..moveTo(size.width * 0.2, size.height * 0.6)
+      ..cubicTo(size.width * 0.3, size.height * 0.2, size.width * 0.4, size.height * 0.9, size.width * 0.5, size.height * 0.4)
+      ..cubicTo(size.width * 0.6, size.height * 0.1, size.width * 0.7, size.height * 0.8, size.width * 0.8, size.height * 0.5);
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

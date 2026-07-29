@@ -66,4 +66,13 @@ public interface ProductService {
      * @return count of barcodes
      */
     long getBarcodeCountByProductId(Long id);
+
+    /**
+     * Updates the status field of a specific barcode record in product_barcodes table.
+     *
+     * @param code   the unique barcode string
+     * @param status the new status (e.g. SCANNED)
+     * @return the updated ProductBarcode entity
+     */
+    com.inventorymanagement.entity.ProductBarcode updateBarcodeStatus(String code, String status);
 }

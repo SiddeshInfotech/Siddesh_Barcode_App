@@ -131,7 +131,7 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
           status: 'INWARDED',
         );
       } catch (e) {
-        debugPrint('ERROR SAVING INWARD ENTRY: $e');
+        debugPrint('Error saving inward entry: $e');
       }
 
       if (!mounted) return;

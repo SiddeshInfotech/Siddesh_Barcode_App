@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
+import '../services/api_service.dart';
 
 class OutwardEntryScreen extends StatefulWidget {
   const OutwardEntryScreen({
     super.key,
     this.product,
+    this.scannedBarcode,
   });
 
   final Product? product;
+  final String? scannedBarcode;
 
   @override
   State<OutwardEntryScreen> createState() => _OutwardEntryScreenState();
@@ -17,20 +20,36 @@ class OutwardEntryScreen extends StatefulWidget {
 class _OutwardEntryScreenState extends State<OutwardEntryScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  late final Product _activeProduct = widget.product ??
-      const Product(
-        id: 'PRD-DEFAULT-OUT',
-        barcode: '123456789012',
-        name: 'Heavy Duty Thermal Label Printer 400',
-        category: 'Printers & Supplies',
-        brand: 'PrintPro',
-        model: 'PP-400T',
-        currentStock: 86,
-        minimumStock: 15,
-        availableStock: 80,
-        imageUrl: 'https://images.unsplash.com/photo-1589492477829-5e65395b66cc?w=500',
-        supplier: 'OmniLogistics Hardware Inc.',
-      );
+  late Product _activeProduct;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeProduct = widget.product ??
+        const Product(
+          id: '0',
+          barcode: '',
+          name: 'Scanned Product',
+          category: 'General',
+          brand: 'Generic',
+          model: 'Standard',
+          currentStock: 0,
+          minimumStock: 0,
+          availableStock: 0,
+          imageUrl: '',
+          supplier: 'Siddesh Infotech',
+        );
+  }
+
+  @override
+  void didUpdateWidget(OutwardEntryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.product != oldWidget.product && widget.product != null) {
+      setState(() {
+        _activeProduct = widget.product!;
+      });
+    }
+  }
 
   int _quantity = 1;
   late final TextEditingController _schoolNameController = TextEditingController(
@@ -85,7 +104,32 @@ class _OutwardEntryScreenState extends State<OutwardEntryScreen> {
         _isSaving = true;
       });
 
-      await Future.delayed(const Duration(milliseconds: 900));
+      final targetBarcode = (widget.scannedBarcode != null && widget.scannedBarcode!.isNotEmpty)
+          ? widget.scannedBarcode!
+          : _activeProduct.barcode;
+      final intId = int.tryParse(_activeProduct.id);
+
+      debugPrint('================ OUTWARD ENTRY FLOW DEBUG ================');
+      debugPrint('[STEP 1] Scanned barcode received: "$targetBarcode"');
+      debugPrint('[STEP 2] Barcode sent from Flutter: "$targetBarcode" (Sending POST to /api/dashboard/outward & PUT to /api/products/barcodes/$targetBarcode/status?status=OUTWARDED)');
+      debugPrint('Product Name: ${_activeProduct.name}');
+      debugPrint('Quantity: $_quantity');
+      debugPrint('Product ID: $intId');
+      debugPrint('======================================================');
+
+      try {
+        await ApiService().recordOutward(
+          barcode: targetBarcode,
+          quantity: _quantity,
+          productId: intId,
+        );
+        await ApiService().updateBarcodeStatus(
+          targetBarcode,
+          status: 'OUTWARDED',
+        );
+      } catch (e) {
+        debugPrint('ERROR SAVING OUTWARD ENTRY: $e');
+      }
 
       if (!mounted) return;
 

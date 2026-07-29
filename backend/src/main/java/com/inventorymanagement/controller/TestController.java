@@ -64,4 +64,19 @@ public class TestController {
     public ResponseEntity<String> authenticatedEndpoint() {
         return ResponseEntity.ok("Success: You are logged in!");
     }
+
+    /**
+     * Endpoint for health probe and database status check.
+     *
+     * @return database connectivity status
+     */
+    @GetMapping("/db-info")
+    @Operation(summary = "Backend & Database health check", description = "Returns system health and DB connectivity state.")
+    public ResponseEntity<java.util.Map<String, Object>> dbInfoEndpoint() {
+        java.util.Map<String, Object> info = new java.util.HashMap<>();
+        info.put("status", "UP");
+        info.put("database", "PostgreSQL (Supabase)");
+        info.put("timestamp", java.time.LocalDateTime.now().toString());
+        return ResponseEntity.ok(info);
+    }
 }
