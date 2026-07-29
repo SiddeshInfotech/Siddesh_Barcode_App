@@ -23,6 +23,10 @@ class QuickAccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -35,7 +39,7 @@ class QuickAccessCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadii.card),
             boxShadow: AppShadows.soft,
             border: Border.all(
-              color: Colors.white.withOpacity(0.8),
+              color: isDark ? const Color(0xFF334155) : Colors.white.withOpacity(0.8),
               width: 1.5,
             ),
           ),
@@ -65,14 +69,14 @@ class QuickAccessCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: AppTextStyles.cardTitle,
+                      style: AppTextStyles.cardTitle.copyWith(color: textPrimary),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: AppTextStyles.cardSubtitle,
+                      style: AppTextStyles.cardSubtitle.copyWith(color: textSecondary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -83,7 +87,7 @@ class QuickAccessCard extends StatelessWidget {
               // Right Chevron Icon
               Icon(
                 Icons.chevron_right_rounded,
-                color: AppColors.textSecondary.withOpacity(0.6),
+                color: textSecondary.withOpacity(0.7),
                 size: 22,
               ),
             ],

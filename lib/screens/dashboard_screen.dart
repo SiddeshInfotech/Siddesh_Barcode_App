@@ -7,7 +7,10 @@ import '../widgets/hero_stock_card.dart';
 import '../widgets/quick_access_card.dart';
 import '../widgets/statistic_card.dart';
 import 'barcode_scanner_screen.dart';
-import 'products_hub_screen.dart' hide AppColors, AppGradients, AppSpacing, AppRadii, AppDurations, AppShadows, AppTextStyles;
+import 'products_hub_screen.dart' hide AppColors, AppGradients, AppShadows;
+import 'scan_history_screen.dart';
+import 'settings_screen.dart';
+import '../services/app_settings_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,6 +25,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     vsync: this,
     duration: const Duration(milliseconds: 1200),
   )..forward();
+
+  late final PageController _pageController = PageController();
 
   late final Animation<double> _fadeIn = CurvedAnimation(
     parent: _animationController,
@@ -63,7 +68,21 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void dispose() {
     _animationController.dispose();
+    _pageController.dispose();
     super.dispose();
+  }
+
+  void _onTabTapped(int index) {
+    setState(() {
+      _selectedNavIndex = index;
+    });
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOutCubic,
+      );
+    }
   }
 
   void _navigateTo(Widget page) {
@@ -115,203 +134,240 @@ class _DashboardScreenState extends State<DashboardScreen>
                 // Subtle Background Blobs
                 const _BackgroundBlobs(),
 
-                // Scrollable Content
-                SingleChildScrollView(
+                // Horizontal Sliding PageView
+                PageView(
+                  controller: _pageController,
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.page,
-                    AppSpacing.page,
-                    AppSpacing.page,
-                    100, // Extra bottom padding for floating nav bar
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top Bar
-                      DashboardAppBar(
-                        onMenuPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Menu tapped'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                        onNotificationPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Notifications tapped'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
+                  onPageChanged: (index) {
+                    setState(() {
+                      _selectedNavIndex = index;
+                    });
+                  },
+                  children: [
+                    // Page 0: Home Dashboard
+                    _buildHomeDashboardView(),
 
-                      // Hero Stock Card with Slide Down animation
-                      SlideTransition(
-                        position: _heroSlideDown,
-                        child: HeroStockCard(
-                          stockCount: '1246',
-                          percentage: '+ 12.5%',
-                          onTap: () => _navigateTo(const ProductsHubScreen()),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
+                    // Page 1: Scanner View
+                    const BarcodeScannerScreen(mode: ScannerMode.inward),
 
-                      // Statistics Section (3 Cards Row) with Slide Up animation
-                      SlideTransition(
-                        position: _statsSlideUp,
-                        child: Row(
-                          children: [
-                            // Card 1: Today's Inward
-                            Expanded(
-                              child: StatisticCard(
-                                title: "Today's\nInward",
-                                value: '28',
-                                subtitle: 'Items',
-                                valueColor: AppColors.green,
-                                iconBgColor: AppColors.greenPastel,
-                                iconColor: AppColors.green,
-                                icon: Icons.south_west_rounded,
-                                onTap: _openInwardScanner,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
+                    // Page 2: Device Scan History
+                    const ScanHistoryScreen(),
 
-                            // Card 2: Today's Outward
-                            Expanded(
-                              child: StatisticCard(
-                                title: "Today's\nOutward",
-                                value: '17',
-                                subtitle: 'Items',
-                                valueColor: AppColors.orange,
-                                iconBgColor: AppColors.orangeIconBg,
-                                iconColor: AppColors.orange,
-                                icon: Icons.north_east_rounded,
-                                onTap: _openOutwardScanner,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-
-                            // Card 3: Low Stock Items
-                            Expanded(
-                              child: StatisticCard(
-                                title: "Low Stock\nItems",
-                                value: '12',
-                                subtitle: 'Items',
-                                valueColor: AppColors.red,
-                                iconBgColor: AppColors.redPastel,
-                                iconColor: AppColors.red,
-                                icon: Icons.warning_amber_rounded,
-                                onTap: () => _navigateTo(const ProductsHubScreen()),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-
-                      // Quick Access Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'Quick Access',
-                            style: AppTextStyles.sectionTitle,
-                          ),
-
-                          // 3 actions Pill Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              '3 actions',
-                              style: AppTextStyles.badgeBlueText,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Quick Access Grid (2 Columns, 2 Rows)
-                      SlideTransition(
-                        position: _quickAccessSlideUp,
-                        child: Column(
-                          children: [
-                            // Row 1: Inward Entry & Outward Entry (Both open BarcodeScannerScreen)
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: QuickAccessCard(
-                                    title: 'Inward\nEntry',
-                                    subtitle: 'Scan product...',
-                                    icon: Icons.south_west_rounded,
-                                    iconColor: AppColors.green,
-                                    iconBgColor: AppColors.mintIconBg,
-                                    gradient: AppGradients.mintCard,
-                                    onTap: _openInwardScanner,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: QuickAccessCard(
-                                    title: 'Outward\nEntry',
-                                    subtitle: 'Scan product...',
-                                    icon: Icons.north_east_rounded,
-                                    iconColor: AppColors.orange,
-                                    iconBgColor: AppColors.orangeIconBg,
-                                    gradient: AppGradients.orangeCard,
-                                    onTap: _openOutwardScanner,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-
-                            // Row 2: Products
-                            QuickAccessCard(
-                              title: 'Products',
-                              subtitle: 'View inventory & management',
-                              icon: Icons.all_inbox_rounded,
-                              iconColor: AppColors.primary,
-                              iconBgColor: AppColors.blueIconBg,
-                              gradient: AppGradients.blueCard,
-                              onTap: () => _navigateTo(const ProductsHubScreen()),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    // Page 3: Settings
+                    const SettingsScreen(),
+                  ],
                 ),
 
-                // Floating Bottom Navigation Bar
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 10,
-                  child: FloatingBottomNavigation(
-                    selectedIndex: _selectedNavIndex,
-                    onItemTapped: (index) {
-                      setState(() {
-                        _selectedNavIndex = index;
-                      });
-                    },
-                    onFabPressed: _openInwardScanner,
+                // Floating Bottom Navigation Bar (Hidden when on Scanner page)
+                if (_selectedNavIndex != 1)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 10,
+                    child: FloatingBottomNavigation(
+                      selectedIndex: _selectedNavIndex,
+                      onItemTapped: _onTabTapped,
+                      onFabPressed: () => _onTabTapped(1),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHomeDashboardView() {
+    return ValueListenableBuilder<Locale>(
+      valueListenable: AppSettingsService().localeNotifier,
+      builder: (context, _, __) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
+
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.page,
+            8,
+            AppSpacing.page,
+            100, // Extra bottom padding for floating nav bar
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Bar
+              DashboardAppBar(
+                onNotificationPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Notifications tapped'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+
+              // Hero Stock Card with Slide Down animation
+              SlideTransition(
+                position: _heroSlideDown,
+                child: HeroStockCard(
+                  stockCount: '1246',
+                  percentage: '+ 12.5%',
+                  onTap: () => _navigateTo(const ProductsHubScreen()),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Statistics Section (2 Cards Row) with Slide Up animation
+              SlideTransition(
+                position: _statsSlideUp,
+                child: Row(
+                  children: [
+                    // Card 1: Today's Inward
+                    Expanded(
+                      child: StatisticCard(
+                        title: AppTranslation.tr('todaysInward'),
+                        value: '28',
+                        subtitle: AppTranslation.tr('items'),
+                        valueColor: AppColors.green,
+                        iconBgColor: isDark ? const Color(0xFF14532D) : AppColors.greenPastel,
+                        iconColor: AppColors.green,
+                        icon: Icons.south_west_rounded,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Card 2: Today's Outward
+                    Expanded(
+                      child: StatisticCard(
+                        title: AppTranslation.tr('todaysOutward'),
+                        value: '17',
+                        subtitle: AppTranslation.tr('items'),
+                        valueColor: AppColors.orange,
+                        iconBgColor: isDark ? const Color(0xFF7C2D12) : AppColors.orangeIconBg,
+                        iconColor: AppColors.orange,
+                        icon: Icons.north_east_rounded,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // Quick Access Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    AppTranslation.tr('quickAccess'),
+                    style: AppTextStyles.sectionTitle.copyWith(color: textPrimary),
+                  ),
+
+                  // 3 actions Pill Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      AppTranslation.tr('actions'),
+                      style: AppTextStyles.badgeBlueText,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Quick Access Grid (2 Columns, 2 Rows)
+              SlideTransition(
+                position: _quickAccessSlideUp,
+                child: Column(
+                  children: [
+                    // Row 1: Inward Entry & Outward Entry (Both open BarcodeScannerScreen)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: QuickAccessCard(
+                            title: AppTranslation.tr('inwardEntry'),
+                            subtitle: AppTranslation.tr('scanProduct'),
+                            icon: Icons.south_west_rounded,
+                            iconColor: AppColors.green,
+                            iconBgColor: isDark ? const Color(0xFF14532D) : AppColors.mintIconBg,
+                            gradient: isDark
+                                ? const LinearGradient(colors: [Color(0xFF064E3B), Color(0xFF022C22)])
+                                : AppGradients.mintCard,
+                            onTap: _openInwardScanner,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: QuickAccessCard(
+                            title: AppTranslation.tr('outwardEntry'),
+                            subtitle: AppTranslation.tr('scanProduct'),
+                            icon: Icons.north_east_rounded,
+                            iconColor: AppColors.orange,
+                            iconBgColor: isDark ? const Color(0xFF7C2D12) : AppColors.orangeIconBg,
+                            gradient: isDark
+                                ? const LinearGradient(colors: [Color(0xFF78350F), Color(0xFF451A03)])
+                                : AppGradients.orangeCard,
+                            onTap: _openOutwardScanner,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Row 2: Products
+                    QuickAccessCard(
+                      title: AppTranslation.tr('products'),
+                      subtitle: AppTranslation.tr('viewInventory'),
+                      icon: Icons.all_inbox_rounded,
+                      iconColor: AppColors.primary,
+                      iconBgColor: isDark ? const Color(0xFF1E3A5F) : AppColors.blueIconBg,
+                      gradient: isDark
+                          ? const LinearGradient(colors: [Color(0xFF1E3A5F), Color(0xFF0F172A)])
+                          : AppGradients.blueCard,
+                      onTap: () => _navigateTo(const ProductsHubScreen()),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSettingsView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: AppColors.bluePastel,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.settings_outlined,
+              size: 48,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('Settings', style: AppTextStyles.sectionTitle),
+          const SizedBox(height: 6),
+          const Text('Manage device & app configuration', style: AppTextStyles.cardSubtitle),
+        ],
       ),
     );
   }

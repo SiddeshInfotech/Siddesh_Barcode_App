@@ -5,11 +5,9 @@ import '../constants/app_constants.dart';
 class DashboardAppBar extends StatefulWidget {
   const DashboardAppBar({
     super.key,
-    this.onMenuPressed,
     this.onNotificationPressed,
   });
 
-  final VoidCallback? onMenuPressed;
   final VoidCallback? onNotificationPressed;
 
   @override
@@ -54,28 +52,8 @@ class _DashboardAppBarState extends State<DashboardAppBar>
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        // Left Menu Button
-        _SquareIconButton(
-          icon: Icons.menu_rounded,
-          onTap: widget.onMenuPressed,
-        ),
-
-        // Center Floating Pill: Dashboard
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.cardBg,
-            borderRadius: BorderRadius.circular(AppRadii.pill),
-            boxShadow: AppShadows.soft,
-          ),
-          child: const Text(
-            'Dashboard',
-            style: AppTextStyles.appBarPill,
-          ),
-        ),
-
         // Right Notification Bell Button with Red Badge & Swing Animation
         AnimatedBuilder(
           animation: _bellController,

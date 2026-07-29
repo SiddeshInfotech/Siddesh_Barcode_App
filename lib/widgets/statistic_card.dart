@@ -25,6 +25,10 @@ class StatisticCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : AppColors.cardBg;
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -33,7 +37,7 @@ class StatisticCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           decoration: BoxDecoration(
-            color: AppColors.cardBg,
+            color: cardBg,
             borderRadius: BorderRadius.circular(AppRadii.medium),
             boxShadow: AppShadows.soft,
           ),
@@ -60,7 +64,7 @@ class StatisticCard extends StatelessWidget {
               // Title Label
               Text(
                 title,
-                style: AppTextStyles.statTitle,
+                style: AppTextStyles.statTitle.copyWith(color: textSecondary),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -74,7 +78,7 @@ class StatisticCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: AppTextStyles.statUnit,
+                style: AppTextStyles.statUnit.copyWith(color: textSecondary),
               ),
             ],
           ),
