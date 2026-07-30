@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'screens/dashboard_screen.dart';
+import 'screens/splash_screen.dart';
+import 'services/app_settings_service.dart';
 
 void main() {
   runApp(const InventoryApp());
@@ -11,19 +12,48 @@ class InventoryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Inventory Management',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3BA8FF),
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF7FBFF),
-        fontFamily: 'Poppins',
-      ),
-      home: const DashboardScreen(),
+    final settingsService = AppSettingsService();
+
+    return ValueListenableBuilder<Locale>(
+      valueListenable: settingsService.localeNotifier,
+      builder: (context, locale, _) {
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: settingsService.themeModeNotifier,
+          builder: (context, themeMode, _) {
+            return MaterialApp(
+              debugShowCheckedModeBanner: false,
+              title: 'Inventory Management',
+              locale: locale,
+              themeMode: themeMode,
+              theme: ThemeData(
+                useMaterial3: true,
+                brightness: Brightness.light,
+                scaffoldBackgroundColor: const Color(0xFFEFF4FA),
+                cardColor: const Color(0xFFFFFFFF),
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color(0xFF2563EB),
+                  brightness: Brightness.light,
+                  surface: const Color(0xFFFFFFFF),
+                ),
+                fontFamily: 'Inter',
+              ),
+              darkTheme: ThemeData(
+                useMaterial3: true,
+                brightness: Brightness.dark,
+                scaffoldBackgroundColor: const Color(0xFF090D16),
+                cardColor: const Color(0xFF1E293B),
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color(0xFF2563EB),
+                  brightness: Brightness.dark,
+                  surface: const Color(0xFF1E293B),
+                ),
+                fontFamily: 'Inter',
+              ),
+              home: const SplashScreen(),
+            );
+          },
+        );
+      },
     );
   }
 }
