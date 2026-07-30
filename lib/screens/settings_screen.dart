@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../constants/app_constants.dart';
 import '../services/app_settings_service.dart';
+import '../services/user_service.dart';
+import 'profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -10,7 +12,11 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final AppSettingsService _settingsService = AppSettingsService();
 
   void _showLanguageBottomSheet() {
@@ -86,8 +92,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E293B) : AppColors.cardBg;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white.withValues(alpha: 0.92);
     final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
     final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
 
@@ -101,9 +108,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.page,
-                12,
+                14,
                 AppSpacing.page,
-                100,
+                110,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,21 +120,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       Material(
                         color: cardBg,
-                        borderRadius: BorderRadius.circular(14),
+                        shape: const CircleBorder(),
+                        elevation: 0,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(14),
+                          customBorder: const CircleBorder(),
                           onTap: () {
                             if (Navigator.canPop(context)) {
                               Navigator.pop(context);
                             }
                           },
                           child: Container(
-                            width: 42,
-                            height: 42,
-                            alignment: Alignment.center,
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: isDark ? const [] : AppShadows.soft,
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                width: 1.5,
+                              ),
+                            ),
                             child: Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              size: 18,
+                              Icons.arrow_back_rounded,
+                              size: 20,
                               color: textPrimary,
                             ),
                           ),
@@ -139,7 +154,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           Text(
                             AppTranslation.tr('settings'),
-                            style: AppTextStyles.sectionTitle.copyWith(color: textPrimary),
+                            style: AppTextStyles.sectionTitle.copyWith(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: textPrimary,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -153,48 +172,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Profile Card Section
-                  ProfileCard(
-                    adminName: AppTranslation.tr('adminUser'),
-                    adminEmail: 'admin@inventory.com',
-                    onEditTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Editing Profile for ${AppTranslation.tr("adminUser")}...'),
-                          backgroundColor: AppColors.primary,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
+                  // Profile Card Section (Dynamic User Profile)
+                  ValueListenableBuilder<UserProfile>(
+                    valueListenable: UserService().userNotifier,
+                    builder: (context, profile, _) {
+                      return ProfileCard(
+                        adminName: profile.fullName,
+                        adminEmail: profile.email,
+                        onEditTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ProfileScreen(),
+                            ),
+                          );
+                        },
                       );
                     },
                   ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
 
                   const SizedBox(height: 24),
 
-                  // Setting Options Header
+                  // Setting Options Header: Preferences & Security
                   Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 12),
                     child: Text(
                       AppTranslation.tr('preferencesSecurity'),
-                      style: AppTextStyles.cardTitle.copyWith(
-                        fontSize: 15,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                         color: textSecondary,
                       ),
                     ),
                   ),
 
-                  // 1. Language Tile
+                  // 1. Language Tile (Screen 4: English > pill badge)
                   SettingsTile(
                     icon: Icons.language_rounded,
-                    iconBgColor: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF),
-                    iconColor: AppColors.primary,
+                    iconBgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6),
+                    iconColor: textPrimary,
                     title: AppTranslation.tr('language'),
                     subtitle: AppTranslation.tr('chooseLanguage'),
                     trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(12),
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFEEF2F6),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -204,7 +227,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ? AppTranslation.tr('marathiName')
                                 : AppTranslation.tr('englishName'),
                             style: TextStyle(
-                              fontFamily: 'Poppins',
+                              fontFamily: 'Inter',
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: textPrimary,
@@ -220,20 +243,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 12),
 
-                  // 2. Theme Tile
+                  // 2. Theme Tile (Screen 4: Sun icon, Light Mode Enabled, Switch)
                   ValueListenableBuilder<ThemeMode>(
                     valueListenable: _settingsService.themeModeNotifier,
                     builder: (context, themeMode, _) {
                       final activeDark = themeMode == ThemeMode.dark;
                       return SettingsTile(
-                        icon: activeDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                        iconBgColor: activeDark ? const Color(0xFF312E81) : const Color(0xFFF5F3FF),
-                        iconColor: AppColors.purple,
+                        icon: activeDark ? Icons.dark_mode_outlined : Icons.wb_sunny_outlined,
+                        iconBgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6),
+                        iconColor: textPrimary,
                         title: AppTranslation.tr('theme'),
                         subtitle: activeDark
                             ? AppTranslation.tr('darkMode')
                             : AppTranslation.tr('lightMode'),
-                        trailing: ThemeSwitch(
+                        trailing: CustomSwitch(
                           value: activeDark,
                           onChanged: (val) {
                             _settingsService.toggleTheme(val);
@@ -248,19 +271,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 12),
 
-                  // 3. Notifications Tile
+                  // 3. Notifications Tile (Screen 4: Bell icon, Receive inventory alerts, Switch)
                   ValueListenableBuilder<bool>(
                     valueListenable: _settingsService.notificationsNotifier,
                     builder: (context, enabled, _) {
                       return SettingsTile(
-                        icon: Icons.notifications_active_rounded,
-                        iconBgColor: isDark ? const Color(0xFF14532D) : AppColors.greenPastel,
-                        iconColor: AppColors.green,
+                        icon: Icons.notifications_none_rounded,
+                        iconBgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6),
+                        iconColor: textPrimary,
                         title: AppTranslation.tr('notifications'),
                         subtitle: enabled
                             ? AppTranslation.tr('receiveAlerts')
                             : AppTranslation.tr('alertsDisabled'),
-                        trailing: NotificationSwitch(
+                        trailing: CustomSwitch(
                           value: enabled,
                           onChanged: (val) {
                             _settingsService.toggleNotifications(val);
@@ -275,11 +298,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 12),
 
-                  // 4. Backup Data Tile
+                  // 4. Backup Data Tile (Screen 4: Cloud icon, Backup inventory information, Chevron)
                   SettingsTile(
-                    icon: Icons.backup_rounded,
-                    iconBgColor: isDark ? const Color(0xFF7C2D12) : AppColors.orangeIconBg,
-                    iconColor: AppColors.orange,
+                    icon: Icons.cloud_queue_rounded,
+                    iconBgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6),
+                    iconColor: textPrimary,
                     title: AppTranslation.tr('backupData'),
                     subtitle: AppTranslation.tr('backupInfo'),
                     trailing: Icon(Icons.chevron_right_rounded, color: textSecondary),
@@ -288,15 +311,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 12),
 
-                  // 5. Logout Tile
+                  // 5. Logout Tile (Screen 4: Red exit icon, Red Logout text & subtitle)
                   SettingsTile(
                     icon: Icons.logout_rounded,
-                    iconBgColor: isDark ? const Color(0xFF7F1D1D) : AppColors.redPastel,
+                    iconBgColor: const Color(0xFFFFECE5),
                     iconColor: AppColors.red,
                     title: AppTranslation.tr('logout'),
                     subtitle: AppTranslation.tr('signOutSecurely'),
                     titleColor: AppColors.red,
-                    trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.red),
+                    trailing: Icon(Icons.chevron_right_rounded, color: textSecondary),
                     onTap: _showLogoutDialog,
                   ).animate().fadeIn(duration: 700.ms).slideY(begin: 0.1, end: 0),
                 ],
@@ -309,7 +332,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// Profile Card Component
+// Profile Card Component (Black Glassy Theme)
 class ProfileCard extends StatelessWidget {
   const ProfileCard({
     super.key,
@@ -324,73 +347,96 @@ class ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E293B) : AppColors.cardBg;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
-
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: cardBg,
+        color: const Color(0xFF111827),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1F2937),
+            Color(0xFF111827),
+          ],
+        ),
         borderRadius: BorderRadius.circular(AppRadii.card),
-        boxShadow: AppShadows.soft,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 20,
+            spreadRadius: 0,
+            offset: const Offset(0, 8),
+          ),
+        ],
+        border: Border.all(
+          color: const Color(0xFF1E293B),
+          width: 1.5,
+        ),
       ),
       child: Row(
         children: [
+          // User Silhouette Avatar
           Container(
-            width: 60,
-            height: 60,
+            width: 54,
+            height: 54,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: AppGradients.hero,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.25),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              color: Colors.white.withValues(alpha: 0.12),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
+              ),
             ),
             child: const Center(
               child: Icon(
-                Icons.admin_panel_settings_rounded,
+                Icons.person_rounded,
                 color: Colors.white,
-                size: 32,
+                size: 34,
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
+
+          // User Name & Email Column
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   adminName,
-                  style: AppTextStyles.sectionTitle.copyWith(fontSize: 18, color: textPrimary),
+                  style: AppTextStyles.sectionTitle.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   adminEmail,
-                  style: AppTextStyles.cardSubtitle.copyWith(color: textSecondary),
+                  style: AppTextStyles.cardSubtitle.copyWith(
+                    color: const Color(0xFF94A3B8),
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
           ),
+
+          // Right Circle Chevron Button
           Material(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.white.withValues(alpha: 0.12),
+            shape: const CircleBorder(),
             child: InkWell(
-              borderRadius: BorderRadius.circular(12),
+              customBorder: const CircleBorder(),
               onTap: onEditTap,
               child: Container(
-                width: 38,
-                height: 38,
+                width: 36,
+                height: 36,
                 alignment: Alignment.center,
                 child: const Icon(
-                  Icons.edit_rounded,
-                  size: 18,
-                  color: AppColors.primary,
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -427,7 +473,7 @@ class SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E293B) : AppColors.cardBg;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white.withValues(alpha: 0.92);
     final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
     final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
 
@@ -435,7 +481,11 @@ class SettingsTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(AppRadii.card),
-        boxShadow: AppShadows.soft,
+        boxShadow: isDark ? const [] : AppShadows.soft,
+        border: Border.all(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          width: 1.5,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -470,6 +520,7 @@ class SettingsTile extends StatelessWidget {
                         style: AppTextStyles.cardTitle.copyWith(
                           color: titleColor ?? textPrimary,
                           fontSize: 15,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -490,9 +541,9 @@ class SettingsTile extends StatelessWidget {
   }
 }
 
-// Theme Switch Component
-class ThemeSwitch extends StatelessWidget {
-  const ThemeSwitch({
+// Custom Switch Component matching Screen 4 active dark pill switch
+class CustomSwitch extends StatelessWidget {
+  const CustomSwitch({
     super.key,
     required this.value,
     required this.onChanged,
@@ -503,10 +554,37 @@ class ThemeSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Switch.adaptive(
-      value: value,
-      onChanged: onChanged,
-      activeColor: AppColors.purple,
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 50,
+        height: 30,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          color: value ? AppColors.darkPill : const Color(0xFFE2E8F0),
+        ),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 200),
+          alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -527,7 +605,7 @@ class NotificationSwitch extends StatelessWidget {
     return Switch.adaptive(
       value: value,
       onChanged: onChanged,
-      activeColor: AppColors.green,
+      activeTrackColor: AppColors.green,
     );
   }
 }

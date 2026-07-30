@@ -7,7 +7,6 @@ import 'package:permission_handler/permission_handler.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
 import '../services/api_service.dart';
-import '../services/product_lookup_service.dart';
 import '../services/scan_history_service.dart';
 import '../widgets/scanner_overlay.dart';
 import 'inward_entry_screen.dart';
@@ -41,7 +40,6 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
   );
 
   final ApiService _apiService = ApiService();
-  final ImagePicker _picker = ImagePicker();
 
   bool _isScanning = true;
   bool _isProcessing = false;
@@ -422,10 +420,10 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
 
   @override
   Widget build(BuildContext context) {
-    const scanWindowSize = Size(270, 270);
+    const scanWindowSize = Size(280, 280);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF090D16),
       body: Stack(
         children: [
           // 1. Mobile Scanner Camera Preview
@@ -442,13 +440,13 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
             },
           ),
 
-          // 2. Custom Scanner Overlay (Blueprint grid, corners, laser, particles)
+          // 2. Custom Scanner Overlay (Blueprint grid background, corner brackets, laser)
           ScannerOverlay(
             scanWindowSize: scanWindowSize,
             isScanning: _isScanning,
           ),
 
-          // 3. Top App Bar
+          // 3. Top App Bar (Back button, Inward Scanner pill, Flash, Gallery)
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -456,44 +454,54 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Back Button
-                  _AppBarSquareButton(
-                    icon: Icons.arrow_back_ios_new_rounded,
-                    onTap: () => Navigator.pop(context),
+                  _CircleGlassIconButton(
+                    icon: Icons.chevron_left_rounded,
+                    iconSize: 28,
+                    onTap: () {
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      }
+                    },
                   ),
 
-                  // Title Pill
+                  // Center Title Pill Container
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.cardBg.withValues(alpha: 0.9),
+                      color: Colors.black.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(AppRadii.pill),
-                      boxShadow: AppShadows.soft,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
                     ),
                     child: Text(
                       widget.mode == ScannerMode.inward
                           ? 'Inward Scanner'
                           : 'Outward Scanner',
-                      style: AppTextStyles.appBarPill,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
 
-                  // Top Right Actions: Torch & Gallery Icon Buttons
+                  // Top Right Actions: Torch & Gallery Buttons
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Flash Torch Toggle Button
-                      _AppBarSquareButton(
+                      _CircleGlassIconButton(
                         icon: _isTorchOn
                             ? Icons.flash_on_rounded
                             : Icons.flash_off_rounded,
-                        iconColor: _isTorchOn ? AppColors.orange : AppColors.textPrimary,
+                        iconColor: _isTorchOn ? AppColors.orange : Colors.white,
                         onTap: _toggleTorch,
                       ),
                       const SizedBox(width: 8),
-
-                      // Gallery Icon Button
-                      _AppBarSquareButton(
-                        icon: Icons.photo_library_outlined,
+                      _CircleGlassIconButton(
+                        icon: Icons.image_outlined,
                         onTap: _pickImageFromGallery,
                       ),
                     ],
@@ -503,13 +511,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
             ),
           ),
 
-<<<<<<< HEAD
-
-
-          // 5. Success Checkmark & Loading Overlay
-=======
           // 4. Success Checkmark & Loading Overlay
->>>>>>> 0029dca (updated functionality of the ui)
           if (_showSuccessCheck || _isProcessing)
             Positioned.fill(
               child: Container(
@@ -540,7 +542,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
                       const Text(
                         'Searching Product Database...',
                         style: TextStyle(
-                          fontFamily: 'Poppins',
+                          fontFamily: 'Inter',
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -552,71 +554,46 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
               ),
             ),
 
-          // 5. Bottom Control Bar (Middle scan trigger button only)
+          // 5. Bottom Circular Glowing Shutter Scan Trigger Button
           Positioned(
             left: 0,
             right: 0,
-            bottom: 30,
-<<<<<<< HEAD
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppColors.cardBg.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: AppShadows.nav,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  // Gallery Pick Button
-                  _BottomControlButton(
-                    icon: Icons.photo_library_outlined,
-                    label: 'Gallery',
-                    onTap: _pickImageFromGallery,
-                  ),
-
-                  // Center Trigger Scan Button
-                  GestureDetector(
-                    onTap: _resetScanner,
-                    child: Container(
-                      width: 58,
-                      height: 58,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: AppGradients.fab,
-                        boxShadow: AppShadows.fabGlow,
-                      ),
-                      child: const Icon(
-                        Icons.qr_code_scanner_rounded,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-=======
+            bottom: 40,
             child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.cardBg.withValues(alpha: 0.92),
-                  shape: BoxShape.circle,
-                  boxShadow: AppShadows.nav,
-                ),
-                child: GestureDetector(
-                  onTap: () {
-                    _handleBarcodeDetected('123456789012');
-                  },
-                  child: Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppGradients.fab,
-                      boxShadow: AppShadows.fabGlow,
+              child: GestureDetector(
+                onTap: () {
+                  _handleBarcodeDetected('123456789012');
+                },
+                child: Container(
+                  width: 84,
+                  height: 84,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 1.5,
                     ),
-                    child: const Icon(
-                      Icons.qr_code_scanner_rounded,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withValues(alpha: 0.25),
+                        blurRadius: 24,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
                       color: Colors.white,
-                      size: 30,
->>>>>>> 0029dca (updated functionality of the ui)
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.qr_code_scanner_rounded,
+                        color: AppColors.darkPill,
+                        size: 36,
+                      ),
                     ),
                   ),
                 ),
@@ -629,16 +606,18 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
   }
 }
 
-class _AppBarSquareButton extends StatelessWidget {
-  const _AppBarSquareButton({
+class _CircleGlassIconButton extends StatelessWidget {
+  const _CircleGlassIconButton({
     required this.icon,
     required this.onTap,
     this.iconColor,
+    this.iconSize = 22,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final Color? iconColor;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -646,65 +625,23 @@ class _AppBarSquareButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         child: Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: AppColors.cardBg.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: AppShadows.soft,
+            color: Colors.black.withValues(alpha: 0.45),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.2),
+              width: 1,
+            ),
           ),
           child: Icon(
             icon,
-            color: iconColor ?? AppColors.textPrimary,
-            size: 22,
+            color: iconColor ?? Colors.white,
+            size: iconSize,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-
-
-class _BottomControlButton extends StatelessWidget {
-  const _BottomControlButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: AppColors.textPrimary,
-              size: 24,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
         ),
       ),
     );

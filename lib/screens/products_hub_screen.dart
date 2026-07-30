@@ -125,7 +125,7 @@ class _ProductsHubScreenState extends State<ProductsHubScreen> {
                     decoration: BoxDecoration(
                       color: cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: AppShadows.soft,
+                      boxShadow: isDark ? const [] : AppShadows.soft,
                     ),
                     child: TextField(
                       controller: _searchController,
@@ -268,7 +268,7 @@ class _ProductsHubScreenState extends State<ProductsHubScreen> {
                               decoration: BoxDecoration(
                                 color: cardBg,
                                 borderRadius: BorderRadius.circular(20),
-                                boxShadow: AppShadows.soft,
+                                boxShadow: isDark ? const [] : AppShadows.soft,
                               ),
                               child: Material(
                                 color: Colors.transparent,

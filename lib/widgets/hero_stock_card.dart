@@ -6,7 +6,7 @@ class HeroStockCard extends StatefulWidget {
   const HeroStockCard({
     super.key,
     this.stockCount = '1246',
-    this.percentage = '+ 12.5%',
+    this.percentage = '12.5%',
     this.onTap,
   });
 
@@ -33,6 +33,8 @@ class _HeroStockCardState extends State<HeroStockCard>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -40,38 +42,42 @@ class _HeroStockCardState extends State<HeroStockCard>
         borderRadius: BorderRadius.circular(AppRadii.hero),
         child: Container(
           width: double.infinity,
-          height: 160,
+          height: 168,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadii.hero),
             gradient: AppGradients.hero,
-            boxShadow: AppShadows.hero,
+            boxShadow: isDark ? const [] : AppShadows.hero,
+            border: Border.all(
+              color: isDark ? Colors.transparent : Colors.white.withValues(alpha: 0.25),
+              width: 1.5,
+            ),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppRadii.hero),
             child: Stack(
               children: [
-                // Soft background glowing circles
+                // Soft background light reflections
                 Positioned(
-                  right: -20,
-                  top: -30,
-                  child: Container(
-                    width: 140,
-                    height: 140,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.12),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 40,
-                  bottom: -40,
+                  left: -20,
+                  top: -20,
                   child: Container(
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -30,
+                  bottom: -30,
+                  child: Container(
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
                     ),
                   ),
                 ),
@@ -79,7 +85,7 @@ class _HeroStockCardState extends State<HeroStockCard>
                 // Card Content Padding
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
+                    horizontal: 22,
                     vertical: 20,
                   ),
                   child: Row(
@@ -110,56 +116,64 @@ class _HeroStockCardState extends State<HeroStockCard>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 14),
 
-                            // Green Trend Badge (+ 12.5%)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
+                            // Peach/Orange Trend Badge (^ 12.5%) vs last month
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
                                   ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.trending_up_rounded,
-                                    color: AppColors.green,
-                                    size: 16,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.orangeBadgeBg,
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    widget.percentage,
-                                    style: AppTextStyles.badgeText,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.keyboard_arrow_up_rounded,
+                                        color: AppColors.orangeBadgeText,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        widget.percentage,
+                                        style: AppTextStyles.badgeText,
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'vs last month',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w400,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
 
-                      // Right Column: Floating 3D Package Illustration & Sparkles
+                      // Right Column: Floating 3D Glossy Box Container & Sparkles
                       AnimatedBuilder(
                         animation: _floatingController,
                         builder: (context, child) {
-                          final offset = math.sin(_floatingController.value * math.pi) * 8;
+                          final offset = math.sin(_floatingController.value * math.pi) * 6;
                           return Transform.translate(
                             offset: Offset(0, -offset),
                             child: child,
                           );
                         },
-                        child: const _PackageIllustrationWidget(),
+                        child: const _3DBoxIllustrationWidget(),
                       ),
                     ],
                   ),
@@ -173,57 +187,122 @@ class _HeroStockCardState extends State<HeroStockCard>
   }
 }
 
-class _PackageIllustrationWidget extends StatelessWidget {
-  const _PackageIllustrationWidget();
+class _3DBoxIllustrationWidget extends StatelessWidget {
+  const _3DBoxIllustrationWidget();
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 100,
-      height: 100,
+      width: 108,
+      height: 108,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Semi-transparent rounded background card for package
+          // Background Glow
           Container(
-            width: 82,
-            height: 82,
+            width: 80,
+            height: 80,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.22),
-              borderRadius: BorderRadius.circular(24),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF60A5FA).withValues(alpha: 0.4),
+                  blurRadius: 30,
+                  spreadRadius: 8,
+                ),
+              ],
+            ),
+          ),
+
+          // Glossy Translucent Glass Cube Container
+          Container(
+            width: 86,
+            height: 86,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.30),
+                  Colors.white.withValues(alpha: 0.08),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: Colors.white.withOpacity(0.35),
+                color: Colors.white.withValues(alpha: 0.45),
                 width: 1.5,
               ),
             ),
-            child: const Icon(
-              Icons.inventory_2_rounded,
-              size: 44,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Top Gloss Highlight
+                Positioned(
+                  top: 0,
+                  left: 12,
+                  right: 12,
+                  child: Container(
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Package Box Vector Icon
+                const Icon(
+                  Icons.inventory_2_rounded,
+                  size: 46,
+                  color: Colors.white,
+                ),
+
+                // Center Blue Light Beam line
+                Positioned(
+                  bottom: 18,
+                  child: Container(
+                    width: 32,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF60A5FA),
+                      borderRadius: BorderRadius.circular(2),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0xFF3B82F6),
+                          blurRadius: 8,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Sparkle star at top right
+          const Positioned(
+            top: 2,
+            right: 2,
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 16,
               color: Colors.white,
             ),
           ),
 
-          // Top Right Sparkle Star
+          // Sparkle dot at bottom left
           Positioned(
-            top: 4,
-            right: 4,
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              size: 18,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
-
-          // Bottom Left Small Sparkle Dot
-          Positioned(
-            bottom: 6,
+            bottom: 4,
             left: 6,
             child: Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
+              width: 5,
+              height: 5,
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white,
               ),
             ),
           ),

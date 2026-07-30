@@ -10,7 +10,11 @@ class ScanHistoryScreen extends StatefulWidget {
   State<ScanHistoryScreen> createState() => _ScanHistoryScreenState();
 }
 
-class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
+class _ScanHistoryScreenState extends State<ScanHistoryScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final ScanHistoryService _historyService = ScanHistoryService();
   String _selectedFilter = 'All';
 
@@ -33,8 +37,9 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E293B) : AppColors.cardBg;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white.withValues(alpha: 0.92);
     final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
     final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
 
@@ -44,67 +49,66 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Title Bar
+            // Header Title Bar with Filter Button
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        AppTranslation.tr('scanHistory'),
-                        style: AppTextStyles.sectionTitle.copyWith(color: textPrimary),
+                        AppTranslation.tr('history'),
+                        style: AppTextStyles.sectionTitle.copyWith(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: textPrimary,
+                        ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         AppTranslation.tr('scanHistorySub'),
-                        style: AppTextStyles.cardSubtitle.copyWith(fontSize: 13, color: textSecondary),
+                        style: AppTextStyles.cardSubtitle.copyWith(
+                          fontSize: 13,
+                          color: textSecondary,
+                        ),
                       ),
                     ],
                   ),
 
-                  // Clear Button
-                  ValueListenableBuilder<List<ScanHistoryItem>>(
-                    valueListenable: _historyService.historyNotifier,
-                    builder: (context, history, _) {
-                      if (history.isEmpty) return const SizedBox.shrink();
-                      return IconButton(
-                        icon: Icon(Icons.delete_outline_rounded, color: textSecondary),
-                        tooltip: AppTranslation.tr('clearHistory'),
-                        onPressed: () {
-                          showDialog<void>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              backgroundColor: cardBg,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                              title: Text(AppTranslation.tr('clearHistory'), style: TextStyle(color: textPrimary)),
-                              content: Text('Remove all device scan logs?', style: TextStyle(color: textSecondary)),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx),
-                                  child: Text(AppTranslation.tr('cancel'), style: TextStyle(color: textSecondary)),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    _historyService.clearHistory();
-                                    Navigator.pop(ctx);
-                                  },
-                                  child: const Text('Clear', style: TextStyle(color: AppColors.red)),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
+                  // Filter Icon Glass Button
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {},
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          shape: BoxShape.circle,
+                          boxShadow: isDark ? const [] : AppShadows.soft,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.tune_rounded,
+                          color: textPrimary,
+                          size: 20,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
 
-            // Filter Chips
+            // Filter Tabs (All, Inward, Outward)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -115,39 +119,52 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                       : (filter == 'Inward' ? AppTranslation.tr('inward') : AppTranslation.tr('outward'));
 
                   return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(filterLabel),
-                      selected: isSelected,
-                      selectedColor: AppColors.primary,
-                      backgroundColor: cardBg,
-                      labelStyle: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected ? Colors.white : textSecondary,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(
-                          color: isSelected ? AppColors.primary : Colors.grey.withValues(alpha: 0.2),
+                    padding: const EdgeInsets.only(right: 10),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedFilter = filter;
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? (isDark ? Colors.white : AppColors.darkPill)
+                              : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: (isSelected && !isDark) ? AppShadows.soft : const [],
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.transparent
+                                : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Text(
+                          filterLabel,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected
+                                ? (isDark ? AppColors.darkPill : Colors.white)
+                                : textSecondary,
+                          ),
                         ),
                       ),
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() {
-                            _selectedFilter = filter;
-                          });
-                        }
-                      },
                     ),
                   );
                 }).toList(),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            // Scan History List
+            // Scan History Content / Empty State Card
             Expanded(
               child: ValueListenableBuilder<List<ScanHistoryItem>>(
                 valueListenable: _historyService.historyNotifier,
@@ -158,45 +175,75 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                   }).toList();
 
                   if (history.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.history_toggle_off_rounded,
-                            size: 64,
-                            color: textSecondary.withValues(alpha: 0.4),
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: isDark ? const [] : AppShadows.soft,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            width: 1.5,
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            AppTranslation.tr('noScans'),
-                            style: AppTextStyles.cardTitle.copyWith(color: textSecondary),
-                          ),
-                        ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const _3DClipboardIllustrationWidget(),
+                            const SizedBox(height: 24),
+                            Text(
+                              AppTranslation.tr('noScans'),
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.cardTitle.copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 40),
+                              child: Text(
+                                'Start scanning to see your history here.',
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.cardSubtitle.copyWith(
+                                  fontSize: 13,
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }
 
                   return ListView.separated(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 110),
                     itemCount: history.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final item = history[index];
                       final isInward = item.entryType.toLowerCase() == 'inward';
-                      final badgeColor = isInward ? AppColors.green : AppColors.orange;
+                      final badgeColor = isInward ? AppColors.primary : AppColors.green;
                       final badgeBg = isInward
-                          ? (isDark ? const Color(0xFF14532D) : AppColors.greenPastel)
-                          : (isDark ? const Color(0xFF7C2D12) : AppColors.orangeIconBg);
+                          ? (isDark ? const Color(0xFF1E3A5F) : AppColors.blueTileBg)
+                          : (isDark ? const Color(0xFF14532D) : AppColors.greenTileBg);
                       final icon = isInward ? Icons.south_west_rounded : Icons.north_east_rounded;
 
                       return Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: cardBg,
-                          borderRadius: BorderRadius.circular(AppRadii.medium),
-                          boxShadow: AppShadows.soft,
+                          borderRadius: BorderRadius.circular(AppRadii.card),
+                          boxShadow: isDark ? const [] : AppShadows.soft,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            width: 1.5,
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -225,7 +272,7 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                                       Expanded(
                                         child: Text(
                                           item.productName,
-                                          style: AppTextStyles.cardTitle.copyWith(fontSize: 14, color: textPrimary),
+                                          style: AppTextStyles.cardTitle.copyWith(fontSize: 15, color: textPrimary),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -237,41 +284,9 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.qr_code_2_rounded,
-                                              size: 13,
-                                              color: textSecondary,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              item.barcode,
-                                              style: TextStyle(
-                                                fontFamily: 'Monospace',
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: textPrimary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '•  ${item.category}',
-                                        style: AppTextStyles.cardSubtitle.copyWith(fontSize: 11, color: textSecondary),
-                                      ),
-                                    ],
+                                  Text(
+                                    '${item.barcode}  •  ${item.category}',
+                                    style: AppTextStyles.cardSubtitle.copyWith(fontSize: 12, color: textSecondary),
                                   ),
                                 ],
                               ),
@@ -287,8 +302,8 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                               child: Text(
                                 '${isInward ? "+" : "-"}${item.quantity}',
                                 style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 12,
+                                  fontFamily: 'Inter',
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                   color: badgeColor,
                                 ),
@@ -305,6 +320,163 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+class _3DClipboardIllustrationWidget extends StatelessWidget {
+  const _3DClipboardIllustrationWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 160,
+      height: 160,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Ambient Glow Behind Illustration
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF60A5FA).withValues(alpha: 0.18),
+                  blurRadius: 40,
+                  spreadRadius: 10,
+                ),
+              ],
+            ),
+          ),
+
+          // 3D Clipboard Container
+          Container(
+            width: 100,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.9),
+                width: 2,
+              ),
+            ),
+            child: Column(
+              children: [
+                // Top Metallic Clip
+                Container(
+                  width: 44,
+                  height: 14,
+                  margin: const EdgeInsets.only(top: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD1D5DB),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Content Lines
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      Container(
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF93C5FD),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E8F0),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 6,
+                        margin: const EdgeInsets.only(right: 18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E8F0),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Floating Clock Badge
+          Positioned(
+            right: 18,
+            bottom: 18,
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF38BDF8),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0284C7).withValues(alpha: 0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(
+                  color: Colors.white,
+                  width: 2.5,
+                ),
+              ),
+              child: const Icon(
+                Icons.access_time_filled_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+
+          // Floating Spheres Accent
+          Positioned(
+            left: 20,
+            top: 26,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFCBD5E1),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 24,
+            top: 14,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

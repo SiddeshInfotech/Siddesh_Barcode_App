@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_constants.dart';
+import '../services/app_settings_service.dart';
 import '../widgets/dashboard_app_bar.dart';
 import '../widgets/floating_bottom_navigation.dart';
 import '../widgets/hero_stock_card.dart';
 import '../widgets/quick_access_card.dart';
 import '../widgets/statistic_card.dart';
 import 'barcode_scanner_screen.dart';
-import 'products_hub_screen.dart' hide AppColors, AppGradients, AppShadows;
+import 'products_hub_screen.dart';
 import 'scan_history_screen.dart';
 import 'settings_screen.dart';
-import '../services/app_settings_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,7 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animationController = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1200),
+    duration: const Duration(milliseconds: 1000),
   )..forward();
 
   late final PageController _pageController = PageController();
@@ -73,14 +73,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _onTabTapped(int index) {
-    setState(() {
-      _selectedNavIndex = index;
-    });
     if (_pageController.hasClients) {
       _pageController.animateToPage(
         index,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeInOutCubic,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
       );
     }
   }
@@ -121,10 +118,14 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF090D16) : const Color(0xFFEFF4FA),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppGradients.background,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF090D16) : const Color(0xFFEFF4FA),
+          gradient: isDark ? null : AppGradients.background,
         ),
         child: SafeArea(
           child: FadeTransition(
@@ -134,18 +135,30 @@ class _DashboardScreenState extends State<DashboardScreen>
                 // Subtle Background Blobs
                 const _BackgroundBlobs(),
 
-                // Horizontal Sliding PageView
+                // Horizontal Smooth Sliding PageView
                 PageView(
                   controller: _pageController,
-                  physics: const BouncingScrollPhysics(),
+                  physics: const PageScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
                   onPageChanged: (index) {
-                    setState(() {
-                      _selectedNavIndex = index;
-                    });
+                    if (_selectedNavIndex != index) {
+                      setState(() {
+                        _selectedNavIndex = index;
+                      });
+                    }
                   },
                   children: [
                     // Page 0: Home Dashboard
-                    _buildHomeDashboardView(),
+                    _HomeDashboardView(
+                      heroSlideDown: _heroSlideDown,
+                      statsSlideUp: _statsSlideUp,
+                      quickAccessSlideUp: _quickAccessSlideUp,
+                      onNavigateToProducts: () =>
+                          _navigateTo(const ProductsHubScreen()),
+                      onOpenInwardScanner: _openInwardScanner,
+                      onOpenOutwardScanner: _openOutwardScanner,
+                    ),
 
                     // Page 1: Scanner View
                     const BarcodeScannerScreen(mode: ScannerMode.inward),
@@ -177,27 +190,60 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
   }
+}
 
-  Widget _buildHomeDashboardView() {
+class _HomeDashboardView extends StatefulWidget {
+  const _HomeDashboardView({
+    required this.heroSlideDown,
+    required this.statsSlideUp,
+    required this.quickAccessSlideUp,
+    required this.onNavigateToProducts,
+    required this.onOpenInwardScanner,
+    required this.onOpenOutwardScanner,
+  });
+
+  final Animation<Offset> heroSlideDown;
+  final Animation<Offset> statsSlideUp;
+  final Animation<Offset> quickAccessSlideUp;
+  final VoidCallback onNavigateToProducts;
+  final VoidCallback onOpenInwardScanner;
+  final VoidCallback onOpenOutwardScanner;
+
+  @override
+  State<_HomeDashboardView> createState() => _HomeDashboardViewState();
+}
+
+class _HomeDashboardViewState extends State<_HomeDashboardView>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
     return ValueListenableBuilder<Locale>(
       valueListenable: AppSettingsService().localeNotifier,
       builder: (context, _, __) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
-        final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
+        final textPrimary =
+            isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
 
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.page,
-            8,
+            12,
             AppSpacing.page,
-            100, // Extra bottom padding for floating nav bar
+            110, // Extra bottom padding for floating nav bar
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Bar
+              // Top Bar Header
               DashboardAppBar(
+                userName: 'Admin',
+                notificationCount: 0,
                 onNotificationPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -207,22 +253,22 @@ class _DashboardScreenState extends State<DashboardScreen>
                   );
                 },
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
 
               // Hero Stock Card with Slide Down animation
               SlideTransition(
-                position: _heroSlideDown,
+                position: widget.heroSlideDown,
                 child: HeroStockCard(
                   stockCount: '1246',
-                  percentage: '+ 12.5%',
-                  onTap: () => _navigateTo(const ProductsHubScreen()),
+                  percentage: '12.5%',
+                  onTap: widget.onNavigateToProducts,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-              // Statistics Section (2 Cards Row) with Slide Up animation
+              // Statistics Section (2 Cards Row: Inward & Outward)
               SlideTransition(
-                position: _statsSlideUp,
+                position: widget.statsSlideUp,
                 child: Row(
                   children: [
                     // Card 1: Today's Inward
@@ -231,9 +277,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                         title: AppTranslation.tr('todaysInward'),
                         value: '28',
                         subtitle: AppTranslation.tr('items'),
-                        valueColor: AppColors.green,
-                        iconBgColor: isDark ? const Color(0xFF14532D) : AppColors.greenPastel,
-                        iconColor: AppColors.green,
+                        valueColor: textPrimary,
+                        iconBgColor: isDark
+                            ? const Color(0xFF1E3A5F)
+                            : AppColors.blueTileBg,
+                        iconColor: AppColors.primary,
                         icon: Icons.south_west_rounded,
                       ),
                     ),
@@ -245,16 +293,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                         title: AppTranslation.tr('todaysOutward'),
                         value: '17',
                         subtitle: AppTranslation.tr('items'),
-                        valueColor: AppColors.orange,
-                        iconBgColor: isDark ? const Color(0xFF7C2D12) : AppColors.orangeIconBg,
-                        iconColor: AppColors.orange,
+                        valueColor: textPrimary,
+                        iconBgColor: isDark
+                            ? const Color(0xFF14532D)
+                            : AppColors.greenTileBg,
+                        iconColor: AppColors.green,
                         icon: Icons.north_east_rounded,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Quick Access Header
               Row(
@@ -269,72 +319,71 @@ class _DashboardScreenState extends State<DashboardScreen>
                   // 3 actions Pill Badge
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
+                      horizontal: 12,
+                      vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
+                      color:
+                          isDark ? const Color(0xFF1E293B) : AppColors.greyPill,
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
-                      AppTranslation.tr('actions'),
-                      style: AppTextStyles.badgeBlueText,
+                      '3 actions',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Quick Access Grid (2 Columns, 2 Rows)
+              // Quick Access Stacked Cards List
               SlideTransition(
-                position: _quickAccessSlideUp,
+                position: widget.quickAccessSlideUp,
                 child: Column(
                   children: [
-                    // Row 1: Inward Entry & Outward Entry (Both open BarcodeScannerScreen)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: QuickAccessCard(
-                            title: AppTranslation.tr('inwardEntry'),
-                            subtitle: AppTranslation.tr('scanProduct'),
-                            icon: Icons.south_west_rounded,
-                            iconColor: AppColors.green,
-                            iconBgColor: isDark ? const Color(0xFF14532D) : AppColors.mintIconBg,
-                            gradient: isDark
-                                ? const LinearGradient(colors: [Color(0xFF064E3B), Color(0xFF022C22)])
-                                : AppGradients.mintCard,
-                            onTap: _openInwardScanner,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: QuickAccessCard(
-                            title: AppTranslation.tr('outwardEntry'),
-                            subtitle: AppTranslation.tr('scanProduct'),
-                            icon: Icons.north_east_rounded,
-                            iconColor: AppColors.orange,
-                            iconBgColor: isDark ? const Color(0xFF7C2D12) : AppColors.orangeIconBg,
-                            gradient: isDark
-                                ? const LinearGradient(colors: [Color(0xFF78350F), Color(0xFF451A03)])
-                                : AppGradients.orangeCard,
-                            onTap: _openOutwardScanner,
-                          ),
-                        ),
-                      ],
+                    // 1: Inward Entry Card
+                    QuickAccessCard(
+                      title: AppTranslation.tr('inwardEntry'),
+                      subtitle: AppTranslation.tr('scanProduct'),
+                      icon: Icons.south_west_rounded,
+                      iconColor: AppColors.primary,
+                      iconBgColor: isDark
+                          ? const Color(0xFF1E3A5F)
+                          : AppColors.blueTileBg,
+                      onTap: widget.onOpenInwardScanner,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
-                    // Row 2: Products
+                    // 2: Outward Entry Card
+                    QuickAccessCard(
+                      title: AppTranslation.tr('outwardEntry'),
+                      subtitle: AppTranslation.tr('scanProduct'),
+                      icon: Icons.north_east_rounded,
+                      iconColor: AppColors.green,
+                      iconBgColor: isDark
+                          ? const Color(0xFF14532D)
+                          : AppColors.greenTileBg,
+                      onTap: widget.onOpenOutwardScanner,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 3: Products Hub Card
                     QuickAccessCard(
                       title: AppTranslation.tr('products'),
-                      subtitle: AppTranslation.tr('viewInventory'),
-                      icon: Icons.all_inbox_rounded,
-                      iconColor: AppColors.primary,
-                      iconBgColor: isDark ? const Color(0xFF1E3A5F) : AppColors.blueIconBg,
-                      gradient: isDark
-                          ? const LinearGradient(colors: [Color(0xFF1E3A5F), Color(0xFF0F172A)])
-                          : AppGradients.blueCard,
-                      onTap: () => _navigateTo(const ProductsHubScreen()),
+                      subtitle: AppTranslation.tr('manageInventory'),
+                      icon: Icons.inventory_2_outlined,
+                      iconColor: AppColors.purple,
+                      iconBgColor: isDark
+                          ? const Color(0xFF312E81)
+                          : AppColors.purpleTileBg,
+                      onTap: widget.onNavigateToProducts,
                     ),
                   ],
                 ),
@@ -345,32 +394,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       },
     );
   }
-
-  Widget _buildSettingsView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              color: AppColors.bluePastel,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.settings_outlined,
-              size: 48,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text('Settings', style: AppTextStyles.sectionTitle),
-          const SizedBox(height: 6),
-          const Text('Manage device & app configuration', style: AppTextStyles.cardSubtitle),
-        ],
-      ),
-    );
-  }
 }
 
 class _BackgroundBlobs extends StatelessWidget {
@@ -378,6 +401,8 @@ class _BackgroundBlobs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return IgnorePointer(
       child: Stack(
         children: [
@@ -390,7 +415,9 @@ class _BackgroundBlobs extends StatelessWidget {
               height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.08),
+                color: isDark
+                    ? const Color(0xFF3B82F6).withValues(alpha: 0.06)
+                    : AppColors.primary.withValues(alpha: 0.08),
               ),
             ),
           ),
@@ -403,7 +430,9 @@ class _BackgroundBlobs extends StatelessWidget {
               height: 260,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.secondary.withValues(alpha: 0.07),
+                color: isDark
+                    ? const Color(0xFF60A5FA).withValues(alpha: 0.05)
+                    : AppColors.secondary.withValues(alpha: 0.07),
               ),
             ),
           ),
@@ -416,7 +445,9 @@ class _BackgroundBlobs extends StatelessWidget {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.purple.withValues(alpha: 0.04),
+                color: isDark
+                    ? const Color(0xFF8B5CF6).withValues(alpha: 0.04)
+                    : AppColors.purple.withValues(alpha: 0.04),
               ),
             ),
           ),
