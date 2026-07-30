@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_constants.dart';
-import '../services/api_service.dart';
 import '../services/app_settings_service.dart';
 import '../widgets/dashboard_app_bar.dart';
 import '../widgets/floating_bottom_navigation.dart';
@@ -22,10 +21,6 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
-  final ApiService _apiService = ApiService();
-  DashboardStats _stats = const DashboardStats();
-  bool _isLoadingStats = true;
-
   late final AnimationController _animationController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1000),
@@ -71,30 +66,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   int _selectedNavIndex = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _loadDashboardStats();
-  }
-
-  Future<void> _loadDashboardStats() async {
-    try {
-      final stats = await _apiService.getDashboardStats();
-      if (mounted) {
-        setState(() {
-          _stats = stats;
-          _isLoadingStats = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingStats = false;
-        });
-      }
-    }
-  }
-
-  @override
   void dispose() {
     _animationController.dispose();
     _pageController.dispose();
@@ -111,8 +82,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  void _navigateTo(Widget page) async {
-    await Navigator.of(context).push(
+  void _navigateTo(Widget page) {
+    Navigator.of(context).push(
       PageRouteBuilder<void>(
         transitionDuration: AppDurations.route,
         reverseTransitionDuration: AppDurations.route,
@@ -135,7 +106,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         },
       ),
     );
-    _loadDashboardStats();
   }
 
   void _openInwardScanner() {
