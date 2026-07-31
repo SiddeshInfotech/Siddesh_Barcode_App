@@ -121,9 +121,14 @@ public class DashboardServiceImpl implements DashboardService {
 
             if (pbOpt.isPresent()) {
                 ProductBarcode pb = pbOpt.get();
+                if (!"GENERATED".equalsIgnoreCase(pb.getStatus())) {
+                    throw new IllegalStateException("Cannot inward: Barcode " + code + " is currently " + pb.getStatus() + ". Expected GENERATED.");
+                }
                 pb.setStatus("INWARDED");
                 productBarcodeRepository.saveAndFlush(pb);
                 logger.info("[RECORD INWARD SUCCESS] Updated ProductBarcode entity ID {} code '{}' status to INWARDED via saveAndFlush()", pb.getId(), pb.getCode());
+            } else {
+                throw new IllegalStateException("Cannot inward: Barcode '" + code + "' not found in product_barcodes table!");
             }
 
             // Update product quantity in products table if present
@@ -138,11 +143,6 @@ public class DashboardServiceImpl implements DashboardService {
                 productRepository.save(p);
                 logger.info("Updated product '{}' (ID {}) stock quantity to {}", p.getName(), p.getId(), p.getQuantity());
             }
-
-            // Update status of unit barcode in product_barcodes table to INWARDED
-            logger.info("4. productService.updateBarcodeStatus() is called for barcode '{}'", code);
-            productService.updateBarcodeStatus(code, "INWARDED");
-            logger.info("Barcode {} updateBarcodeStatus() called with status INWARDED", code);
         }
     }
 
@@ -189,9 +189,14 @@ public class DashboardServiceImpl implements DashboardService {
 
             if (pbOpt.isPresent()) {
                 ProductBarcode pb = pbOpt.get();
+                if (!"INWARDED".equalsIgnoreCase(pb.getStatus())) {
+                    throw new IllegalStateException("Cannot outward: Barcode " + code + " is currently " + pb.getStatus() + ". Expected INWARDED.");
+                }
                 pb.setStatus("OUTWARDED");
                 productBarcodeRepository.saveAndFlush(pb);
                 logger.info("[RECORD OUTWARD SUCCESS] Updated ProductBarcode entity ID {} code '{}' status to OUTWARDED via saveAndFlush()", pb.getId(), pb.getCode());
+            } else {
+                throw new IllegalStateException("Cannot outward: Barcode '" + code + "' not found in product_barcodes table!");
             }
 
             // Update product quantity in products table if present
@@ -207,10 +212,6 @@ public class DashboardServiceImpl implements DashboardService {
                 productRepository.save(p);
                 log.info("Updated product '{}' (ID {}) stock quantity to {}", p.getName(), p.getId(), p.getQuantity());
             }
-
-            // Update status of unit barcode in product_barcodes table to OUTWARDED
-            productService.updateBarcodeStatus(code, "OUTWARDED");
-            log.info("Barcode {} updateBarcodeStatus() called with status OUTWARDED", code);
         }
     }
 }

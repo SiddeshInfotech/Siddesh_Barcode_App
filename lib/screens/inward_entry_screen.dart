@@ -125,6 +125,19 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
         );
       } catch (e) {
         debugPrint('ERROR SAVING INWARD ENTRY: $e');
+        if (!mounted) return;
+        setState(() {
+          _isSaving = false;
+        });
+        String msg = e.toString().replaceFirst('Exception: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
       }
 
       if (!mounted) return;

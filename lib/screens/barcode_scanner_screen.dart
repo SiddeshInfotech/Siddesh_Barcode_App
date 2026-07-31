@@ -185,66 +185,20 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
     if (!mounted) return;
 
     Product? product;
-    Map<String, dynamic>? rpcResult;
-    String? rpcStatus;
 
-    debugPrint('================ [TRACE: _handleBarcodeDetected] ================');
-    debugPrint('[TRACE] Barcode scanned: "$barcode"');
-    debugPrint('[TRACE STEP 1] Calling ApiService().scanReceive(rawBarcode: "$barcode", deviceSource: "CAMERA")...');
-    debugPrint('==================================================================');
-
-    try {
-      rpcResult = await _apiService.scanReceive(
-        rawBarcode: barcode,
-        deviceSource: 'CAMERA',
-      );
-      rpcStatus = rpcResult['status']?.toString();
-      debugPrint('[TRACE STEP 1 SUCCESS] RPC Returned Status: "$rpcStatus" | Full Payload: $rpcResult');
-    } catch (e, stackTrace) {
-      debugPrint('[TRACE STEP 1 ERROR] scan_receive RPC execution failed: $e\nStackTrace: $stackTrace');
-      if (!mounted) return;
-      
-      final String errorMessage = e.toString().contains('NO_OFFICE')
-          ? 'NO_OFFICE: user profile has no office assigned'
-          : 'Scan Receive RPC Failed: ${e.toString()}';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-      _resetScanner();
-      return;
-    }
-
-    if (rpcResult == null || rpcResult['ok'] != true) {
-      final String msg = rpcResult?['message']?.toString() ?? 'Barcode scan error: NOT_FOUND';
-      debugPrint('[TRACE RPC FAILED] RPC returned non-ok result: $msg');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-      _resetScanner();
-      return;
-    }
-
-    // 2. Fetch product details for UI presentation only after RPC success
+    // 1. Try querying Spring Boot backend first
     try {
       product = await _apiService.getProductByBarcode(barcode);
     } catch (e) {
-      debugPrint('[BarcodeScannerScreen] Backend lookup info ($e). Falling back to local ProductLookupService...');
+      debugPrint('[BarcodeScannerScreen] Backend lookup failed or timed out ($e). Falling back to local ProductLookupService...');
     }
 
+    // 2. Fallback to mock product database if backend query fails or product missing
     if (product == null) {
       product = await ProductLookupService.getProductByBarcode(barcode);
     }
 
+    // 3. Fallback to auto-generated product model so inward entry form opens seamlessly
     if (product == null) {
       final shortId = barcode.length > 6 ? barcode.substring(barcode.length - 6) : barcode;
       product = Product(
@@ -264,11 +218,12 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
 
     if (!mounted) return;
 
+    // Add to scan history
     ScanHistoryService().addScan(
       barcode: barcode,
       productName: product.name,
       category: product.category,
-      entryType: rpcStatus ?? 'INWARDED',
+      entryType: widget.mode == ScannerMode.inward ? 'INWARDED' : 'OUTWARDED',
     );
 
     setState(() {
@@ -276,7 +231,23 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
       _showSuccessCheck = false;
     });
 
-    _showScanSuccessModal(product, barcode, rpcStatus ?? 'INWARDED', rpcResult);
+    _navigateToEntryScreen(product, barcode);
+  }
+
+  void _navigateToEntryScreen(Product product, String scannedBarcode) {
+    if (widget.mode == ScannerMode.inward) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => InwardEntryScreen(product: product, scannedBarcode: scannedBarcode),
+        ),
+      );
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => OutwardEntryScreen(product: product, scannedBarcode: scannedBarcode),
+        ),
+      );
+    }
   }
 
   void _showScanSuccessModal(Product product, String scannedBarcode, String status, Map<String, dynamic> rpcPayload) {

@@ -65,7 +65,7 @@ public class InventoryManagementApplication {
         // Test the database connection before letting JPA / Hibernate initialize
         String url = System.getProperty("spring.datasource.url");
         if (url == null) url = System.getenv("spring.datasource.url");
-        if (url == null) url = "jdbc:postgresql://aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres";
+        if (url == null) url = "jdbc:postgresql://aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres?sslmode=require";
 
         String user = System.getProperty("spring.datasource.username");
         if (user == null) user = System.getenv("spring.datasource.username");

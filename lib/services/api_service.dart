@@ -43,7 +43,7 @@ class ApiService {
   static String? _resolvedBaseUrl;
   
   // Primary PC LAN IP address for backend running on developer PC
-  static const String pcLanIp = '10.97.198.106';
+  static const String pcLanIp = '192.168.1.102';
   static const String defaultPort = '8080';
 
   // Timeout for standard requests (3 seconds for responsive fallback)
@@ -54,78 +54,8 @@ class ApiService {
 
   // Helper method to automatically select correct backend URL based on platform
   Future<String> getBaseUrl({bool forceRefresh = false}) async {
-    if (!forceRefresh && _resolvedBaseUrl != null) {
-      return _resolvedBaseUrl!;
-    }
-
-    if (kIsWeb) {
-      _resolvedBaseUrl = 'http://localhost:$defaultPort';
-      debugPrint('[ApiService] Platform is Web. Backend Base URL: $_resolvedBaseUrl');
-      return _resolvedBaseUrl!;
-    }
-
-    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-      _resolvedBaseUrl = 'http://localhost:$defaultPort';
-      debugPrint('[ApiService] Platform is Desktop. Backend Base URL: $_resolvedBaseUrl');
-      return _resolvedBaseUrl!;
-    }
-
-    if (Platform.isAndroid) {
-      // Android Physical Device & Emulator Resolution:
-      // 1. Try ADB Reverse Tunnel Loopback (127.0.0.1:8080) for USB connected physical Android device
-      const adbLoopbackUrl = 'http://127.0.0.1:$defaultPort';
-      debugPrint('[ApiService] Probing ADB reverse tunnel loopback ($adbLoopbackUrl)...');
-      try {
-        final res = await http.get(Uri.parse('$adbLoopbackUrl/api/test/db-info'))
-            .timeout(probeTimeout);
-        if (res.statusCode >= 200 && res.statusCode < 600) {
-          _resolvedBaseUrl = adbLoopbackUrl;
-          debugPrint('[ApiService] Successfully connected via ADB reverse tunnel: $_resolvedBaseUrl');
-          return _resolvedBaseUrl!;
-        }
-      } catch (e) {
-        debugPrint('[ApiService] ADB reverse tunnel probe failed ($adbLoopbackUrl): $e');
-      }
-
-      // 2. Try Android emulator gateway 10.0.2.2 for Android Emulators
-      const emulatorUrl = 'http://10.0.2.2:$defaultPort';
-      debugPrint('[ApiService] Probing Android Emulator gateway: $emulatorUrl...');
-      try {
-        final res = await http.get(Uri.parse('$emulatorUrl/api/test/db-info'))
-            .timeout(probeTimeout);
-        if (res.statusCode >= 200 && res.statusCode < 600) {
-          _resolvedBaseUrl = emulatorUrl;
-          debugPrint('[ApiService] Connected via Android Emulator Gateway: $_resolvedBaseUrl');
-          return _resolvedBaseUrl!;
-        }
-      } catch (e) {
-        debugPrint('[ApiService] Emulator probe failed ($emulatorUrl): $e');
-      }
-
-      // 3. Try PC LAN IP address 192.168.1.102 (Physical Android Phone connected via local Wi-Fi)
-      final lanUrl = 'http://$pcLanIp:$defaultPort';
-      debugPrint('[ApiService] Probing PC LAN IP backend URL: $lanUrl...');
-      try {
-        final res = await http.get(Uri.parse('$lanUrl/api/test/db-info'))
-            .timeout(probeTimeout);
-        if (res.statusCode >= 200 && res.statusCode < 600) {
-          _resolvedBaseUrl = lanUrl;
-          debugPrint('[ApiService] Successfully connected to PC LAN IP: $_resolvedBaseUrl');
-          return _resolvedBaseUrl!;
-        }
-      } catch (e) {
-        debugPrint('[ApiService] LAN IP probe failed ($lanUrl): $e');
-      }
-
-      // Default fallback: Try Android emulator gateway 10.0.2.2 first for emulators
-      _resolvedBaseUrl = emulatorUrl;
-      debugPrint('[ApiService] Defaulting to Android Emulator Gateway: $_resolvedBaseUrl');
-      return _resolvedBaseUrl!;
-    }
-
-    // Default fallback
-    _resolvedBaseUrl = 'http://$pcLanIp:$defaultPort';
-    debugPrint('[ApiService] Backend Base URL: $_resolvedBaseUrl');
+    _resolvedBaseUrl = 'http://192.168.1.111:8080';
+    debugPrint('[ApiService] FORCE HARDCODED to PC LAN: $_resolvedBaseUrl');
     return _resolvedBaseUrl!;
   }
 
@@ -208,9 +138,12 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Bypass-Tunnel-Reminder': 'true'
+        },
         body: requestBody,
-      ).timeout(const Duration(seconds: 2));
+      ).timeout(const Duration(seconds: 15));
 
       _logResponse('POST', url, response.statusCode, response.body);
 
@@ -244,6 +177,7 @@ class ApiService {
   Map<String, String> _getHeaders() {
     return {
       'Content-Type': 'application/json',
+      'Bypass-Tunnel-Reminder': 'true',
       if (_token != null) 'Authorization': 'Bearer $_token',
     };
   }
@@ -272,7 +206,7 @@ class ApiService {
       final response = await http.get(
         Uri.parse(url),
         headers: _getHeaders(),
-      ).timeout(const Duration(seconds: 2));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
@@ -352,7 +286,7 @@ class ApiService {
 
       if (_token == null) {
         debugPrint('[TRACE] Pre-authenticating with backend server...');
-        await _login().timeout(const Duration(seconds: 2));
+        await _login().timeout(const Duration(seconds: 15));
       }
 
       debugPrint('[TRACE] STEP 2: Sending POST request to HTTP RPC Gateway: $url');
@@ -361,7 +295,7 @@ class ApiService {
         Uri.parse(url),
         headers: _getHeaders(),
         body: jsonEncode(rpcPayload),
-      ).timeout(const Duration(seconds: 3));
+      ).timeout(const Duration(seconds: 15));
 
       _logResponse('POST', url, response.statusCode, response.body);
       debugPrint('[TRACE] STEP 2 RESPONSE: Status=${response.statusCode}, Body=${response.body}');
@@ -493,11 +427,21 @@ class ApiService {
         Uri.parse(url),
         headers: _getHeaders(),
         body: payload,
-      ).timeout(const Duration(seconds: 10));
-      return response.statusCode == 200;
+      ).timeout(const Duration(seconds: 15));
+      
+      if (response.statusCode == 200) return true;
+      
+      String errorMsg = 'Failed to record inward entry';
+      try {
+        final errData = jsonDecode(response.body);
+        if (errData['message'] != null) {
+          errorMsg = errData['message'];
+        }
+      } catch (_) {}
+      throw Exception(errorMsg);
     } catch (e) {
       debugPrint('[ApiService] Error recording inward transaction: $e');
-      return false;
+      rethrow;
     }
   }
 
@@ -519,11 +463,21 @@ class ApiService {
         Uri.parse(url),
         headers: _getHeaders(),
         body: payload,
-      ).timeout(const Duration(seconds: 10));
-      return response.statusCode == 200;
+      ).timeout(const Duration(seconds: 15));
+      
+      if (response.statusCode == 200) return true;
+      
+      String errorMsg = 'Failed to record outward entry';
+      try {
+        final errData = jsonDecode(response.body);
+        if (errData['message'] != null) {
+          errorMsg = errData['message'];
+        }
+      } catch (_) {}
+      throw Exception(errorMsg);
     } catch (e) {
       debugPrint('[ApiService] Error recording outward transaction: $e');
-      return false;
+      rethrow;
     }
   }
 }

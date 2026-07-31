@@ -122,6 +122,19 @@ class _OutwardEntryScreenState extends State<OutwardEntryScreen> {
         );
       } catch (e) {
         debugPrint('ERROR SAVING OUTWARD ENTRY: $e');
+        if (!mounted) return;
+        setState(() {
+          _isSaving = false;
+        });
+        String msg = e.toString().replaceFirst('Exception: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
       }
 
       if (!mounted) return;
