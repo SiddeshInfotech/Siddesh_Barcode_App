@@ -114,10 +114,7 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
 
       debugPrint('================ INWARD ENTRY FLOW DEBUG ================');
       debugPrint('[STEP 1] Scanned barcode received: "$targetBarcode"');
-      debugPrint('[STEP 2] Barcode sent from Flutter: "$targetBarcode" (Sending POST to /api/dashboard/inward & PUT to /api/products/barcodes/$targetBarcode/status?status=INWARDED)');
-      debugPrint('Product Name: ${_activeProduct.name}');
-      debugPrint('Quantity: $_quantity');
-      debugPrint('Product ID: $intId');
+      debugPrint('[STEP 2] Recording inward entry for product ${_activeProduct.name} (Qty: $_quantity)');
       debugPrint('======================================================');
 
       try {
@@ -125,10 +122,6 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
           barcode: targetBarcode,
           quantity: _quantity,
           productId: intId,
-        );
-        await ApiService().updateBarcodeStatus(
-          targetBarcode,
-          status: 'INWARDED',
         );
       } catch (e) {
         debugPrint('ERROR SAVING INWARD ENTRY: $e');

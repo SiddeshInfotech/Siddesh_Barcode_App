@@ -25,5 +25,6 @@ public class ProductResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private java.util.List<String> barcodes;
+    private java.util.Map<String, String> barcodeStatuses;
     private Long barcodeCount;
 }

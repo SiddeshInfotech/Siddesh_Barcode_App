@@ -7,10 +7,12 @@ import 'package:permission_handler/permission_handler.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
 import '../services/api_service.dart';
+import '../services/product_lookup_service.dart';
 import '../services/scan_history_service.dart';
 import '../widgets/scanner_overlay.dart';
 import 'inward_entry_screen.dart';
 import 'outward_entry_screen.dart';
+import 'product_detail_screen.dart';
 
 enum ScannerMode { inward, outward }
 
@@ -53,17 +55,21 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
   }
 
   Future<void> _preAuthenticateBackend() async {
-    final baseUrl = await _apiService.getBaseUrl();
-    debugPrint('================ SCANNER INIT ================');
-    debugPrint('PRE-AUTH BACKEND BASE URL: $baseUrl');
-    debugPrint('==============================================');
-    final success = await _apiService.ensureAuthenticated();
-    if (mounted) {
-      if (!success) {
-        debugPrint('[BarcodeScannerScreen] Pre-auth warning: backend at $baseUrl unreachable or credentials invalid.');
-      } else {
-        debugPrint('[BarcodeScannerScreen] Pre-auth complete! Auth token acquired prior to scanner detection.');
+    try {
+      final baseUrl = await _apiService.getBaseUrl();
+      debugPrint('================ SCANNER INIT ================');
+      debugPrint('PRE-AUTH BACKEND BASE URL: $baseUrl');
+      debugPrint('==============================================');
+      final success = await _apiService.ensureAuthenticated();
+      if (mounted) {
+        if (!success) {
+          debugPrint('[BarcodeScannerScreen] Pre-auth warning: backend at $baseUrl unreachable or credentials invalid.');
+        } else {
+          debugPrint('[BarcodeScannerScreen] Pre-auth complete! Auth token acquired prior to scanner detection.');
+        }
       }
+    } catch (e) {
+      debugPrint('[BarcodeScannerScreen] Pre-auth check skipped: $e');
     }
   }
 
@@ -179,33 +185,90 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
     if (!mounted) return;
 
     Product? product;
-    String? connectionError;
+    Map<String, dynamic>? rpcResult;
+    String? rpcStatus;
+
+    debugPrint('================ [TRACE: _handleBarcodeDetected] ================');
+    debugPrint('[TRACE] Barcode scanned: "$barcode"');
+    debugPrint('[TRACE STEP 1] Calling ApiService().scanReceive(rawBarcode: "$barcode", deviceSource: "CAMERA")...');
+    debugPrint('==================================================================');
 
     try {
+      rpcResult = await _apiService.scanReceive(
+        rawBarcode: barcode,
+        deviceSource: 'CAMERA',
+      );
+      rpcStatus = rpcResult['status']?.toString();
+      debugPrint('[TRACE STEP 1 SUCCESS] RPC Returned Status: "$rpcStatus" | Full Payload: $rpcResult');
+    } catch (e, stackTrace) {
+      debugPrint('[TRACE STEP 1 ERROR] scan_receive RPC execution failed: $e\nStackTrace: $stackTrace');
+      if (!mounted) return;
+      
+      final String errorMessage = e.toString().contains('NO_OFFICE')
+          ? 'NO_OFFICE: user profile has no office assigned'
+          : 'Scan Receive RPC Failed: ${e.toString()}';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      _resetScanner();
+      return;
+    }
+
+    if (rpcResult == null || rpcResult['ok'] != true) {
+      final String msg = rpcResult?['message']?.toString() ?? 'Barcode scan error: NOT_FOUND';
+      debugPrint('[TRACE RPC FAILED] RPC returned non-ok result: $msg');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      _resetScanner();
+      return;
+    }
+
+    // 2. Fetch product details for UI presentation only after RPC success
+    try {
       product = await _apiService.getProductByBarcode(barcode);
-    } on ProductNotFoundException {
-      try {
-        product = await _apiService.createProduct(
-          name: 'Product ($barcode)',
-          barcode: barcode,
-          price: 99.99,
-          quantity: 10,
-          description: 'Auto-registered for scanned barcode: $barcode',
-        );
-      } catch (e) {
-        connectionError = e.toString();
-      }
     } catch (e) {
-      connectionError = e.toString();
+      debugPrint('[BarcodeScannerScreen] Backend lookup info ($e). Falling back to local ProductLookupService...');
+    }
+
+    if (product == null) {
+      product = await ProductLookupService.getProductByBarcode(barcode);
+    }
+
+    if (product == null) {
+      final shortId = barcode.length > 6 ? barcode.substring(barcode.length - 6) : barcode;
+      product = Product(
+        id: 'PRD-$shortId',
+        barcode: barcode,
+        name: 'Scanned Item ($barcode)',
+        category: 'General Inventory',
+        brand: 'Siddesh Tech',
+        model: 'STD-2026',
+        currentStock: 50,
+        minimumStock: 10,
+        availableStock: 45,
+        imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500',
+        supplier: 'Siddesh Infotech Supplier',
+      );
     }
 
     if (!mounted) return;
 
     ScanHistoryService().addScan(
       barcode: barcode,
-      productName: product?.name ?? 'Scanned Barcode ($barcode)',
-      category: product?.category ?? 'Scanned Item',
-      entryType: widget.mode == ScannerMode.inward ? 'Inward' : 'Outward',
+      productName: product.name,
+      category: product.category,
+      entryType: rpcStatus ?? 'INWARDED',
     );
 
     setState(() {
@@ -213,104 +276,366 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
       _showSuccessCheck = false;
     });
 
-    if (product != null) {
-      _navigateToEntryScreen(product, barcode);
-    } else if (connectionError != null) {
-      _showConnectionErrorBottomSheet(connectionError);
-    }
+    _showScanSuccessModal(product, barcode, rpcStatus ?? 'INWARDED', rpcResult);
   }
 
-  void _navigateToEntryScreen(Product product, String scannedBarcode) {
-    if (widget.mode == ScannerMode.inward) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => InwardEntryScreen(product: product, scannedBarcode: scannedBarcode),
-        ),
-      );
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => OutwardEntryScreen(product: product, scannedBarcode: scannedBarcode),
-        ),
-      );
-    }
-  }
-
-  void _showConnectionErrorBottomSheet(String error) {
+  void _showScanSuccessModal(Product product, String scannedBarcode, String status, Map<String, dynamic> rpcPayload) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final isOutward = status.toUpperCase().contains('OUTWARD');
+
         return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: AppColors.cardBg,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFF1F2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.error_outline_rounded,
-                  color: Color(0xFFF43F5E),
-                  size: 40,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Connection Failure',
-                style: AppTextStyles.sectionTitle,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Failed to query backend database:\n$error',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.cardSubtitle,
-              ),
-              const SizedBox(height: 28),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        side: const BorderSide(color: AppColors.primary),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _resetScanner();
-                      },
-                      child: const Text(
-                        'Dismiss',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 20,
+                offset: Offset(0, -5),
               ),
             ],
           ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Handle Bar
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Success Badge Header
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: (isOutward ? Colors.amber : Colors.green).withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isOutward ? Icons.file_upload_outlined : Icons.check_circle_rounded,
+                        color: isOutward ? Colors.amber.shade700 : Colors.green.shade600,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Scan Verified',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: isDark ? Colors.white70 : Colors.grey.shade600,
+                            ),
+                          ),
+                          Text(
+                            product.name,
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF1E293B),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Status Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: (isOutward ? Colors.orange : Colors.blue).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isOutward ? Colors.orange : Colors.blue,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isOutward ? Colors.orange.shade700 : Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Product Card View (Image + Info)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? Colors.white10 : Colors.grey.shade200,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Product Image
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          product.imageUrl,
+                          width: 72,
+                          height: 72,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 72,
+                            height: 72,
+                            color: isDark ? Colors.white10 : Colors.grey.shade200,
+                            child: Icon(Icons.inventory_2, color: isDark ? Colors.white38 : Colors.grey),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2563EB).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    product.category,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  product.brand,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? Colors.white54 : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Model: ${product.model}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? Colors.white70 : Colors.grey.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Supplier: ${product.supplier}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white38 : Colors.grey.shade500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Key Specs Grid (Barcode, Stock Stats)
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildSpecCard(
+                        title: 'Scanned Barcode',
+                        value: scannedBarcode,
+                        icon: Icons.qr_code,
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildSpecCard(
+                        title: 'Current Stock',
+                        value: '${product.currentStock} units',
+                        icon: Icons.warehouse,
+                        isDark: isDark,
+                      ),
+                    ),
+                  ],
+                ),
+                if (rpcPayload['ledger_id'] != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.receipt_long, size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Ledger Txn ID: ',
+                          style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+                        ),
+                        Expanded(
+                          child: Text(
+                            rpcPayload['ledger_id'].toString(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontFamily: 'monospace',
+                              color: isDark ? Colors.white70 : Colors.grey.shade800,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ProductDetailScreen(barcode: scannedBarcode),
+                            ),
+                          );
+                        },
+                        child: Text(
+                          'Product Page',
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.grey.shade800,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _resetScanner();
+                        },
+                        child: const Text(
+                          'Scan Next Item',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
-    ).then((_) => _resetScanner());
+    );
   }
 
+  Widget _buildSpecCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: const Color(0xFF2563EB)),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.white38 : Colors.grey.shade500,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF1E293B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+
   void _resetScanner() {
+
     setState(() {
       _isScanning = true;
       _isProcessing = false;

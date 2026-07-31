@@ -52,6 +52,7 @@ public class DashboardController {
     @PreAuthorize("hasAnyRole('ADMIN', 'STORE_MANAGER', 'SALES_EXECUTIVE')")
     @Operation(summary = "Record Inward Transaction", description = "Records inward inventory transaction and updates total stock metrics.")
     public ResponseEntity<Void> recordInward(@RequestBody TransactionRequest request) {
+        log.info("1. DashboardController received POST /api/dashboard/inward | Payload: barcode='{}'", request != null ? request.getBarcode() : null);
         log.info("[STEP 3] Controller entered: POST /api/dashboard/inward | Barcode: '{}', Quantity: {}, ProductId: {}",
                 request != null ? request.getBarcode() : "NULL",
                 request != null ? request.getQuantity() : 0,

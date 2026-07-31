@@ -43,7 +43,7 @@ public class BarcodeStatusFlowAcceptanceTest {
 
     @BeforeEach
     void setUp() {
-        LoginRequest loginRequest = new LoginRequest("admin@inventory.com", "AdminPassword123!");
+        LoginRequest loginRequest = new LoginRequest("SiddeshERP78@gmail.com", "SiddeshERP78@@!!##");
         ResponseEntity<Map> response = restTemplate.postForEntity(
                 "http://localhost:" + port + "/api/auth/login",
                 loginRequest,

@@ -26,7 +26,7 @@ public class AuthControllerIntegrationTest {
 
     @Test
     public void testLogin() {
-        LoginRequest request = new LoginRequest("admin@inventory.com", "AdminPassword123!");
+        LoginRequest request = new LoginRequest("SiddeshERP78@gmail.com", "SiddeshERP78@@!!##");
         ResponseEntity<Object> response = restTemplate.postForEntity(
             "http://localhost:" + port + "/api/auth/login",
             request,

@@ -292,13 +292,21 @@ public class ProductServiceImpl implements ProductService {
         }
 
         // 1. Direct native SQL UPDATE on exact code match (e.g. "VR-260729-0074")
-        int affectedRows = productBarcodeRepository.updateStatusByCode(cleanCode, targetStatus);
+        int rows = productBarcodeRepository.updateStatusByCode(cleanCode, targetStatus);
         log.info("[NATIVE SQL UPDATE EXACT] UPDATE product_barcodes SET status = '{}' WHERE LOWER(TRIM(code)) = LOWER(TRIM('{}')) -> Rows affected: {}",
-                targetStatus, cleanCode, affectedRows);
+                targetStatus, cleanCode, rows);
+        log.info("5. Rows updated returned by updateStatusByCode(): {}", rows);
+        log.info("Rows Updated = {}", rows);
+        if (rows == 0) {
+            log.error("No barcode matched for code '{}'", cleanCode);
+        }
 
-        // 2. If exact match affected 0 rows, check if cleanCode is a master barcode prefix (e.g. "VR-260729")
-        // and update the next GENERATED unit barcode starting with "VR-260729-"
-        if (affectedRows == 0 && !cleanCode.contains("-")) {
+        ProductBarcode pbRead = productBarcodeRepository.findByCodeIgnoreCase(cleanCode).orElse(null);
+        log.info("6. Read barcode immediately after update -> Status: {}", pbRead != null ? pbRead.getStatus() : "NOT FOUND");
+        log.info("DB Status After Update = {}", pbRead != null ? pbRead.getStatus() : "NOT FOUND");
+
+        int affectedRows = rows;
+        if (affectedRows == 0) {
             List<ProductBarcode> generatedUnits = productBarcodeRepository.findByCodePrefixAndStatus(cleanCode + "-%", "GENERATED");
             if (!generatedUnits.isEmpty()) {
                 ProductBarcode targetUnit = generatedUnits.get(0);
@@ -519,6 +527,14 @@ public class ProductServiceImpl implements ProductService {
         UUID productUuid = new UUID(0L, id);
         List<ProductBarcode> pBarcodes = productBarcodeRepository.findByProductId(productUuid);
         List<String> codeList = (pBarcodes != null) ? pBarcodes.stream().map(ProductBarcode::getCode).toList() : List.of();
+        java.util.Map<String, String> statusMap = new java.util.HashMap<>();
+        if (pBarcodes != null) {
+            for (ProductBarcode pb : pBarcodes) {
+                if (pb.getCode() != null) {
+                    statusMap.put(pb.getCode(), pb.getStatus() != null ? pb.getStatus() : "GENERATED");
+                }
+            }
+        }
 
         return ProductResponse.builder()
                 .id(id)
@@ -533,7 +549,42 @@ public class ProductServiceImpl implements ProductService {
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .barcodes(codeList)
+                .barcodeStatuses(statusMap)
                 .barcodeCount((long) codeList.size())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public java.util.Map<String, Object> scanReceive(String code, String clientTxnId, String deviceSource) {
+        log.info("[ProductServiceImpl] Executing scan_receive RPC: code='{}', txn='{}', source='{}'", code, clientTxnId, deviceSource);
+        if (jdbcTemplate == null) {
+            throw new IllegalStateException("JdbcTemplate unavailable for scan_receive RPC execution");
+        }
+
+        try {
+            java.util.UUID txnUuid = (clientTxnId != null && !clientTxnId.trim().isEmpty())
+                    ? java.util.UUID.fromString(clientTxnId.trim())
+                    : java.util.UUID.randomUUID();
+            String cleanCode = normalizeBarcode(code);
+            String source = (deviceSource != null && !deviceSource.trim().isEmpty()) ? deviceSource.trim().toUpperCase() : "CAMERA";
+
+            String jsonResult = jdbcTemplate.queryForObject(
+                "SELECT public.scan_receive(?, ?::uuid, ?::public.scan_source)::text",
+                String.class,
+                cleanCode,
+                txnUuid.toString(),
+                source
+            );
+
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> resultMap = mapper.readValue(jsonResult, java.util.Map.class);
+            log.info("[ProductServiceImpl] scan_receive RPC result: {}", resultMap);
+            return resultMap;
+        } catch (Exception e) {
+            log.error("[ProductServiceImpl] Error executing scan_receive RPC: {}", e.getMessage(), e);
+            throw new RuntimeException("scan_receive RPC failure: " + e.getMessage(), e);
+        }
     }
 }

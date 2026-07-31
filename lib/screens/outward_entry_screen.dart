@@ -111,10 +111,7 @@ class _OutwardEntryScreenState extends State<OutwardEntryScreen> {
 
       debugPrint('================ OUTWARD ENTRY FLOW DEBUG ================');
       debugPrint('[STEP 1] Scanned barcode received: "$targetBarcode"');
-      debugPrint('[STEP 2] Barcode sent from Flutter: "$targetBarcode" (Sending POST to /api/dashboard/outward & PUT to /api/products/barcodes/$targetBarcode/status?status=OUTWARDED)');
-      debugPrint('Product Name: ${_activeProduct.name}');
-      debugPrint('Quantity: $_quantity');
-      debugPrint('Product ID: $intId');
+      debugPrint('[STEP 2] Recording outward entry for product ${_activeProduct.name} (Qty: $_quantity)');
       debugPrint('======================================================');
 
       try {
@@ -122,10 +119,6 @@ class _OutwardEntryScreenState extends State<OutwardEntryScreen> {
           barcode: targetBarcode,
           quantity: _quantity,
           productId: intId,
-        );
-        await ApiService().updateBarcodeStatus(
-          targetBarcode,
-          status: 'OUTWARDED',
         );
       } catch (e) {
         debugPrint('ERROR SAVING OUTWARD ENTRY: $e');

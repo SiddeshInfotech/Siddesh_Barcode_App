@@ -75,4 +75,14 @@ public interface ProductService {
      * @return the updated ProductBarcode entity
      */
     com.inventorymanagement.entity.ProductBarcode updateBarcodeStatus(String code, String status);
+
+    /**
+     * Executes the Supabase PostgreSQL public.scan_receive RPC.
+     *
+     * @param code          scanned barcode
+     * @param clientTxnId   unique transaction UUID
+     * @param deviceSource  device source (CAMERA / MANUAL / USB)
+     * @return Map containing RPC result payload
+     */
+    java.util.Map<String, Object> scanReceive(String code, String clientTxnId, String deviceSource);
 }

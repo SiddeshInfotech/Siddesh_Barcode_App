@@ -43,8 +43,9 @@ class ApiService {
   static const String pcLanIp = '10.97.198.106';
   static const String defaultPort = '8080';
 
-  // Timeout for standard requests (10 seconds)
-  final Duration timeoutDuration = const Duration(seconds: 10);
+  // Timeout for standard requests (3 seconds for responsive fallback)
+  final Duration timeoutDuration = const Duration(seconds: 3);
+
   // Probe timeout for active IP detection (1.5 seconds)
   final Duration probeTimeout = const Duration(milliseconds: 1500);
 
@@ -194,8 +195,8 @@ class ApiService {
     final activeBaseUrl = await getBaseUrl();
     final url = '$activeBaseUrl/api/auth/login';
     final requestBody = jsonEncode({
-      'email': 'admin@inventory.com',
-      'password': 'AdminPassword123!',
+      'email': 'SiddeshERP78@gmail.com',
+      'password': 'SiddeshERP78@@!!##',
     });
 
     debugPrint('[ApiService] Attempting Silent Authentication POST request to: $url');
@@ -384,7 +385,7 @@ class ApiService {
       final response = await http.put(
         Uri.parse(url),
         headers: _getHeaders(),
-      ).timeout(timeoutDuration);
+      ).timeout(const Duration(seconds: 10));
 
       _logResponse('PUT', url, response.statusCode, response.body);
       debugPrint('[ApiService] Updated barcode status for "$cleanCode" to "$status" -> Status: ${response.statusCode}');
@@ -420,19 +421,19 @@ class ApiService {
     final payload = jsonEncode({
       'name': name,
       'barcode': barcode,
+      'code': barcode,
       'price': price,
       'quantity': quantity,
-      'description': description ?? 'Product created for barcode $barcode',
-      'sku': sku ?? 'SKU-${DateTime.now().millisecondsSinceEpoch}',
-      'category': category ?? 'General',
+      'description': description ?? '',
+      'sku': sku,
+      'category': category ?? 'General Merchandise',
       'brand': brand ?? 'Generic',
       if (barcodes != null && barcodes.isNotEmpty) 'barcodes': barcodes,
     });
 
-    _logRequest('POST', url, headers: _getHeaders(), body: payload);
-
     try {
-      var response = await http.post(
+      _logRequest('POST', url, headers: _getHeaders(), body: payload);
+      final response = await http.post(
         Uri.parse(url),
         headers: _getHeaders(),
         body: payload,
@@ -487,6 +488,7 @@ class ApiService {
     final url = '$activeBaseUrl/api/dashboard/inward';
     final payload = jsonEncode({
       if (barcode != null) 'barcode': barcode,
+      if (barcode != null) 'code': barcode,
       if (productId != null) 'productId': productId,
       'quantity': quantity,
     });
@@ -496,7 +498,7 @@ class ApiService {
         Uri.parse(url),
         headers: _getHeaders(),
         body: payload,
-      ).timeout(timeoutDuration);
+      ).timeout(const Duration(seconds: 10));
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('[ApiService] Error recording inward transaction: $e');
@@ -512,6 +514,7 @@ class ApiService {
     final url = '$activeBaseUrl/api/dashboard/outward';
     final payload = jsonEncode({
       if (barcode != null) 'barcode': barcode,
+      if (barcode != null) 'code': barcode,
       if (productId != null) 'productId': productId,
       'quantity': quantity,
     });
@@ -521,7 +524,7 @@ class ApiService {
         Uri.parse(url),
         headers: _getHeaders(),
         body: payload,
-      ).timeout(timeoutDuration);
+      ).timeout(const Duration(seconds: 10));
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('[ApiService] Error recording outward transaction: $e');

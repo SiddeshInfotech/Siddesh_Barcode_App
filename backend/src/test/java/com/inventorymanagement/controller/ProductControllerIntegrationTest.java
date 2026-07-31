@@ -40,7 +40,7 @@ public class ProductControllerIntegrationTest {
 
     @BeforeEach
     public void setUp() {
-        adminToken = getLoginToken("admin@inventory.com", "AdminPassword123!");
+        adminToken = getLoginToken("SiddeshERP78@gmail.com", "SiddeshERP78@@!!##");
         managerToken = getLoginToken("manager@inventory.com", "ManagerPassword123!");
         salesToken = getLoginToken("sales@inventory.com", "SalesPassword123!");
     }

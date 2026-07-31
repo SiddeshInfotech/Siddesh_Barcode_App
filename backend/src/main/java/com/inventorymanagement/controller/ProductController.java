@@ -160,6 +160,24 @@ public class ProductController {
     }
 
     /**
+     * Executes the Supabase PostgreSQL public.scan_receive RPC.
+     *
+     * @param body map containing p_code, p_client_txn_id, p_device_source
+     * @return RPC execution result payload
+     */
+    @PostMapping("/barcodes/scan-receive")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STORE_MANAGER', 'SALES_EXECUTIVE')")
+    @Operation(summary = "Execute scan_receive RPC", description = "Calls the database public.scan_receive RPC for official barcode lifecycle transitions.")
+    public ResponseEntity<?> scanReceive(@RequestBody java.util.Map<String, Object> body) {
+        String pCode = (String) body.get("p_code");
+        String pClientTxnId = (String) body.get("p_client_txn_id");
+        String pDeviceSource = (String) body.getOrDefault("p_device_source", "CAMERA");
+        log.info("Controller entered: POST /api/products/barcodes/scan-receive for code '{}'", pCode);
+        java.util.Map<String, Object> result = productService.scanReceive(pCode, pClientTxnId, pDeviceSource);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
      * Lists all products in the inventory catalog (All authenticated roles).
      *
      * @param page    zero-based page index

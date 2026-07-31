@@ -1,0 +1,94 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { createHashRouter, RouterProvider } from 'react-router-dom'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { AppShell } from '@/components/layout/AppShell'
+import { AuthProvider } from '@/hooks/useAuth'
+import { AlertProvider } from '@/hooks/useAlert'
+import { ConfirmProvider } from '@/hooks/useConfirm'
+import { SidebarProvider } from '@/hooks/useSidebar'
+import { ThemeProvider } from '@/hooks/useTheme'
+import { BarcodeEditor } from '@/routes/BarcodeEditor'
+import { Barcodes } from '@/routes/Barcodes'
+import { Dashboard } from '@/routes/Dashboard'
+import { Inward } from '@/routes/Inward'
+import { Login } from '@/routes/Login'
+import { Outward } from '@/routes/Outward'
+import { ProductDetail } from '@/routes/ProductDetail'
+import { ProductEditor } from '@/routes/ProductEditor'
+import { Products } from '@/routes/Products'
+import { Reports } from '@/routes/Reports'
+import { Settings } from '@/routes/Settings'
+import { Stock } from '@/routes/Stock'
+import './styles.css'
+
+/**
+ * Hash history, not browser history: production loads over file://, where there is no
+ * server to resolve path routes.
+ */
+const router = createHashRouter([
+  { path: '/login', element: <Login /> },
+  {
+    path: '/',
+    element: (
+      <ProtectedRoute>
+        <AppShell />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Dashboard /> },
+      // Static segments before the :id route, or "new" resolves as a product id.
+      { path: 'products', element: <Products /> },
+      { path: 'products/new', element: <ProductEditor /> },
+      { path: 'products/:id', element: <ProductDetail /> },
+      { path: 'products/:id/edit', element: <ProductEditor /> },
+      { path: 'barcodes', element: <Barcodes /> },
+      { path: 'barcodes/generate', element: <BarcodeEditor /> },
+      { path: 'barcodes/:id/generate', element: <BarcodeEditor /> },
+      { path: 'inward', element: <Inward /> },
+      { path: 'outward', element: <Outward /> },
+      { path: 'stock', element: <Stock /> },
+      { path: 'reports', element: <Reports /> },
+      { path: 'settings', element: <Settings /> }
+    ]
+  }
+])
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // The app runs on office wifi all day; refetching on every window focus would hammer
+      // the database for no benefit. Stock views override this with a shorter staleTime.
+      refetchOnWindowFocus: false,
+      staleTime: 60_000,
+      retry: 1
+    }
+  }
+})
+
+const rootElement = document.getElementById('root')
+if (!rootElement) throw new Error('Root element #root not found in index.html')
+
+// ThemeProvider sits outermost so even the ErrorBoundary's fallback screen is themed —
+// a crash should not also flash the wrong colour scheme at the user.
+createRoot(rootElement).render(
+  <StrictMode>
+    <ThemeProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <SidebarProvider>
+              <AlertProvider>
+                <ConfirmProvider>
+                  <RouterProvider router={router} />
+                </ConfirmProvider>
+              </AlertProvider>
+            </SidebarProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
+  </StrictMode>
+)
