@@ -7,12 +7,11 @@ import 'package:permission_handler/permission_handler.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
 import '../services/api_service.dart';
-import '../services/product_lookup_service.dart';
-import '../services/scan_history_service.dart';
 import '../widgets/scanner_overlay.dart';
 import 'inward_entry_screen.dart';
 import 'outward_entry_screen.dart';
 import 'product_detail_screen.dart';
+import 'product_not_found_screen.dart';
 
 enum ScannerMode { inward, outward }
 
@@ -184,47 +183,44 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen>
 
     if (!mounted) return;
 
-    Product? product;
-
-    // 1. Try querying Spring Boot backend first
+    // Look up the real product in the database. Never fabricate one — an unknown
+    // barcode goes to the "not found" screen, a network failure shows an error.
+    final Product product;
     try {
       product = await _apiService.getProductByBarcode(barcode);
-    } catch (e) {
-      debugPrint('[BarcodeScannerScreen] Backend lookup failed or timed out ($e). Falling back to local ProductLookupService...');
-    }
-
-    // 2. Fallback to mock product database if backend query fails or product missing
-    if (product == null) {
-      product = await ProductLookupService.getProductByBarcode(barcode);
-    }
-
-    // 3. Fallback to auto-generated product model so inward entry form opens seamlessly
-    if (product == null) {
-      final shortId = barcode.length > 6 ? barcode.substring(barcode.length - 6) : barcode;
-      product = Product(
-        id: 'PRD-$shortId',
-        barcode: barcode,
-        name: 'Scanned Item ($barcode)',
-        category: 'General Inventory',
-        brand: 'Siddesh Tech',
-        model: 'STD-2026',
-        currentStock: 50,
-        minimumStock: 10,
-        availableStock: 45,
-        imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500',
-        supplier: 'Siddesh Infotech Supplier',
+    } on ProductNotFoundException {
+      if (!mounted) return;
+      setState(() {
+        _isProcessing = false;
+        _showSuccessCheck = false;
+      });
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ProductNotFoundScreen(barcode: barcode),
+        ),
       );
+      return;
+    } catch (e) {
+      debugPrint('[BarcodeScannerScreen] Product lookup failed: $e');
+      if (!mounted) return;
+      final message = e is NetworkException
+          ? 'Could not reach the server. Check the backend and network, then scan again.'
+          : 'Lookup failed. Please scan again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _resetScanner();
+      return;
     }
 
     if (!mounted) return;
 
-    // Add to scan history
-    ScanHistoryService().addScan(
-      barcode: barcode,
-      productName: product.name,
-      category: product.category,
-      entryType: widget.mode == ScannerMode.inward ? 'INWARDED' : 'OUTWARDED',
-    );
+    // Do NOT record scan history here — the movement is not saved yet. History is
+    // recorded only after the entry screen confirms the committed DB status change.
 
     setState(() {
       _isProcessing = false;

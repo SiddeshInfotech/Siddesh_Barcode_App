@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_constants.dart';
+import '../services/api_service.dart';
 import '../services/app_settings_service.dart';
 import '../widgets/dashboard_app_bar.dart';
 import '../widgets/floating_bottom_navigation.dart';
@@ -218,6 +219,30 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
   @override
   bool get wantKeepAlive => true;
 
+  final ApiService _apiService = ApiService();
+
+  DashboardStats? _stats;
+  bool _isLoadingStats = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    if (mounted) setState(() => _isLoadingStats = true);
+    final stats = await _apiService.getDashboardStats();
+    if (!mounted) return;
+    setState(() {
+      _stats = stats;
+      _isLoadingStats = false;
+    });
+  }
+
+  /// Shows a real DB value, or a neutral placeholder while the first load is in flight.
+  String _statText(int? value) => _isLoadingStats ? '—' : '${value ?? 0}';
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -229,8 +254,11 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
         final textPrimary =
             isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
 
-        return SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
+        return RefreshIndicator(
+          onRefresh: _loadStats,
+          color: AppColors.primary,
+          child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.page,
             12,
@@ -259,8 +287,7 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
               SlideTransition(
                 position: widget.heroSlideDown,
                 child: HeroStockCard(
-                  stockCount: '1246',
-                  percentage: '12.5%',
+                  stockCount: _statText(_stats?.currentStock),
                   onTap: widget.onNavigateToProducts,
                 ),
               ),
@@ -275,7 +302,7 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
                     Expanded(
                       child: StatisticCard(
                         title: AppTranslation.tr('todaysInward'),
-                        value: '28',
+                        value: _statText(_stats?.todayInward),
                         subtitle: AppTranslation.tr('items'),
                         valueColor: textPrimary,
                         iconBgColor: isDark
@@ -291,7 +318,7 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
                     Expanded(
                       child: StatisticCard(
                         title: AppTranslation.tr('todaysOutward'),
-                        value: '17',
+                        value: _statText(_stats?.todayOutward),
                         subtitle: AppTranslation.tr('items'),
                         valueColor: textPrimary,
                         iconBgColor: isDark
@@ -389,6 +416,7 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
                 ),
               ),
             ],
+          ),
           ),
         );
       },

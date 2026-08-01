@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../constants/app_constants.dart';
+import '../services/api_service.dart';
 import '../services/app_settings_service.dart';
 import '../services/user_service.dart';
 import 'profile_screen.dart';
@@ -69,6 +70,17 @@ class _SettingsScreenState extends State<SettingsScreen>
         },
       ),
     );
+  }
+
+  Future<void> _showBackendConfigSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const BackendConfigBottomSheet(),
+    );
+    // Refresh the tile subtitle to reflect any new manual/auto selection.
+    if (mounted) setState(() {});
   }
 
   void _showLogoutDialog() {
@@ -298,7 +310,22 @@ class _SettingsScreenState extends State<SettingsScreen>
 
                   const SizedBox(height: 12),
 
-                  // 4. Backup Data Tile (Screen 4: Cloud icon, Backup inventory information, Chevron)
+                  // 4. Backend Server Tile — configure / test the desktop backend connection
+                  SettingsTile(
+                    icon: Icons.dns_rounded,
+                    iconBgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6),
+                    iconColor: textPrimary,
+                    title: 'Backend Server',
+                    subtitle: ApiService.manualBaseUrl == null
+                        ? 'Auto-detect on this network'
+                        : 'Manual: ${ApiService.manualBaseUrl}',
+                    trailing: Icon(Icons.chevron_right_rounded, color: textSecondary),
+                    onTap: _showBackendConfigSheet,
+                  ).animate().fadeIn(duration: 630.ms).slideY(begin: 0.1, end: 0),
+
+                  const SizedBox(height: 12),
+
+                  // 5. Backup Data Tile (Screen 4: Cloud icon, Backup inventory information, Chevron)
                   SettingsTile(
                     icon: Icons.cloud_queue_rounded,
                     iconBgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6),
@@ -890,6 +917,261 @@ class LogoutDialog extends StatelessWidget {
           child: Text(AppTranslation.tr('logout'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
       ],
+    );
+  }
+}
+
+// Backend Server Configuration Bottom Sheet — lets the user override or test the
+// desktop backend address when auto-discovery cannot find it on the current network.
+class BackendConfigBottomSheet extends StatefulWidget {
+  const BackendConfigBottomSheet({super.key});
+
+  @override
+  State<BackendConfigBottomSheet> createState() => _BackendConfigBottomSheetState();
+}
+
+class _BackendConfigBottomSheetState extends State<BackendConfigBottomSheet> {
+  late final TextEditingController _controller =
+      TextEditingController(text: ApiService.manualBaseUrl ?? '');
+
+  bool _isTesting = false;
+  bool? _testPassed; // null = not tested yet
+  String? _resultMessage;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _testConnection() async {
+    final input = _controller.text.trim();
+    if (input.isEmpty) {
+      setState(() {
+        _testPassed = false;
+        _resultMessage = 'Enter the laptop IP address first (e.g. 192.168.43.5).';
+      });
+      return;
+    }
+
+    setState(() {
+      _isTesting = true;
+      _testPassed = null;
+      _resultMessage = null;
+    });
+
+    final reachable = await ApiService().testConnection(input);
+
+    if (!mounted) return;
+    setState(() {
+      _isTesting = false;
+      _testPassed = reachable != null;
+      _resultMessage = reachable != null
+          ? 'Connected — backend reachable at $reachable'
+          : 'No response. Check the IP, that the backend is running, and that both devices are on the same network.';
+    });
+  }
+
+  void _save() {
+    final input = _controller.text.trim();
+    ApiService.setManualBaseUrl(input.isEmpty ? null : input);
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(input.isEmpty
+            ? 'Cleared — using automatic detection'
+            : 'Saved backend server: $input'),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _useAutoDetect() {
+    ApiService.setManualBaseUrl(null);
+    _controller.clear();
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Using automatic detection on this network'),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF1E293B) : AppColors.cardBg;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
+
+    final Color? statusColor = _testPassed == null
+        ? null
+        : (_testPassed! ? AppColors.green : AppColors.red);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: sheetBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Backend Server',
+              style: AppTextStyles.sectionTitle.copyWith(color: textPrimary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'The app finds the laptop automatically. Set the IP manually only if it cannot.',
+              style: AppTextStyles.cardSubtitle.copyWith(color: textSecondary),
+            ),
+            const SizedBox(height: 20),
+
+            // IP / URL input — a real label, not just a placeholder.
+            Text(
+              'Laptop IP or address',
+              style: AppTextStyles.statTitle.copyWith(color: textSecondary),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _controller,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: textPrimary,
+              ),
+              decoration: InputDecoration(
+                hintText: '192.168.43.5  (port 8080 assumed)',
+                hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.7)),
+                prefixIcon: Icon(Icons.dns_rounded, color: AppColors.primary, size: 20),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF3F4F6),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+
+            if (_resultMessage != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    _testPassed! ? Icons.check_circle_rounded : Icons.error_rounded,
+                    color: statusColor,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _resultMessage!,
+                      style: AppTextStyles.cardSubtitle.copyWith(color: statusColor),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            // Test Connection
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: _isTesting ? null : _testConnection,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: _isTesting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      )
+                    : Icon(Icons.wifi_tethering_rounded, color: AppColors.primary),
+                label: Text(
+                  _isTesting ? 'Testing…' : 'Test Connection',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Save
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _isTesting ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.save_rounded, color: Colors.white, size: 20),
+                label: const Text(
+                  'Save',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Auto-detect (clear override)
+            Center(
+              child: TextButton.icon(
+                onPressed: _isTesting ? null : _useAutoDetect,
+                icon: Icon(Icons.autorenew_rounded, size: 18, color: textSecondary),
+                label: Text(
+                  'Use automatic detection',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w600,
+                    color: textSecondary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 }

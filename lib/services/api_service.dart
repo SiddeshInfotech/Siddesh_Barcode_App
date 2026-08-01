@@ -1,15 +1,9 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
+
 import '../models/product_model.dart';
-import 'product_lookup_service.dart';
 import 'supabase_service.dart';
 
-import 'dart:async';
-
-// Custom exceptions for API calls
+// Custom exceptions for data-layer calls.
 class NetworkException implements Exception {
   final String message;
   NetworkException(this.message);
@@ -38,294 +32,118 @@ class ServerErrorException implements Exception {
   String toString() => message;
 }
 
+/// Facade the screens call. It now delegates to [SupabaseService], so the phone reads
+/// and writes the same Supabase project the desktop app uses (auth + RLS + the locked
+/// `save_inward` / `save_outward` RPCs). Method names are kept so screens are unchanged.
 class ApiService {
-  static String? _token;
-  static String? _resolvedBaseUrl;
-  
-  // Primary PC LAN IP address for backend running on developer PC
-  static const String pcLanIp = '192.168.1.102';
-  static const String defaultPort = '8080';
+  final SupabaseService _db = SupabaseService();
 
-  // Timeout for standard requests (3 seconds for responsive fallback)
-  final Duration timeoutDuration = const Duration(seconds: 3);
-
-  // Probe timeout for active IP detection (1.5 seconds)
-  final Duration probeTimeout = const Duration(milliseconds: 1500);
-
-  // Helper method to automatically select correct backend URL based on platform
+  /// Kept for callers (e.g. Settings) that display the data source. Returns the Supabase
+  /// project URL — there is no LAN backend to discover any more.
   Future<String> getBaseUrl({bool forceRefresh = false}) async {
-    _resolvedBaseUrl = 'http://192.168.1.111:8080';
-    debugPrint('[ApiService] FORCE HARDCODED to PC LAN: $_resolvedBaseUrl');
-    return _resolvedBaseUrl!;
+    return SupabaseService.supabaseUrl;
   }
 
-  // Ensure user is authenticated before barcode scanning or operations start
+  /// Ensures a Supabase session exists so RLS grants access. Returns true on success.
   Future<bool> ensureAuthenticated() async {
-    final baseUrl = await getBaseUrl();
-    debugPrint('[ApiService] Verifying authentication before barcode scanning...');
-    debugPrint('[ApiService] Backend Base URL in use: $baseUrl');
-    
-    if (_token != null && _token!.isNotEmpty) {
-      debugPrint('[ApiService] Auth token already present. Pre-auth verified.');
-      return true;
-    }
-
-    final success = await _login();
-    if (success) {
-      debugPrint('[ApiService] Silent authentication successful! Auth token acquired.');
-    } else {
-      debugPrint('[ApiService] Silent authentication failed. Backend at $baseUrl unreachable or credentials invalid.');
-    }
-    return success;
+    final ok = await _db.ensureSignedIn();
+    debugPrint('[ApiService] Supabase auth ${ok ? "ready" : "FAILED"}');
+    return ok;
   }
 
-  // Connection logging helper
-  void _logConnection({
-    required String baseUrl,
-    required String requestUrl,
-    required String responseStatus,
-    required String errorMessage,
-  }) {
-    debugPrint('================ CONNECTION LOG ================');
-    debugPrint('BASE URL: $baseUrl');
-    debugPrint('REQUEST URL: $requestUrl');
-    debugPrint('RESPONSE STATUS: $responseStatus');
-    debugPrint('ERROR MESSAGE: $errorMessage');
-    debugPrint('================================================');
-  }
-
-  // Helper method to log requests, responses, and errors
-  void _logRequest(String method, String url, {Map<String, String>? headers, String? body}) {
-    debugPrint('================ HTTP REQUEST ================');
-    debugPrint('Method: $method');
-    debugPrint('URL: $url');
-    if (headers != null) {
-      debugPrint('Headers: $headers');
-    }
-    if (body != null) {
-      debugPrint('Body: $body');
-    }
-    debugPrint('==============================================');
-  }
-
-  void _logResponse(String method, String url, int statusCode, String body) {
-    debugPrint('================ HTTP RESPONSE ================');
-    debugPrint('URL: $url ($method)');
-    debugPrint('Status Code: $statusCode');
-    debugPrint('Body: $body');
-    debugPrint('===============================================');
-  }
-
-  void _logError(String method, String url, dynamic error) {
-    debugPrint('================ HTTP ERROR ================');
-    debugPrint('URL: $url ($method)');
-    debugPrint('Error: $error');
-    debugPrint('============================================');
-  }
-
-  // Silent login with seeded admin credentials (2-second timeout)
-  Future<bool> _login() async {
-    final activeBaseUrl = await getBaseUrl();
-    final url = '$activeBaseUrl/api/auth/login';
-    final requestBody = jsonEncode({
-      'email': 'SiddeshERP78@gmail.com',
-      'password': 'SiddeshERP78@@!!##',
-    });
-
-    debugPrint('[ApiService] Attempting Silent Authentication POST request to: $url');
-    _logRequest('POST', url, headers: {'Content-Type': 'application/json'}, body: requestBody);
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Bypass-Tunnel-Reminder': 'true'
-        },
-        body: requestBody,
-      ).timeout(const Duration(seconds: 15));
-
-      _logResponse('POST', url, response.statusCode, response.body);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        _token = data['token'] as String?;
-        _logConnection(
-          baseUrl: activeBaseUrl,
-          requestUrl: url,
-          responseStatus: '${response.statusCode} OK',
-          errorMessage: 'None',
-        );
-        debugPrint('[ApiService] Auth Success! Token length: ${_token?.length ?? 0}');
-        return _token != null;
-      }
-
-      _logConnection(
-        baseUrl: activeBaseUrl,
-        requestUrl: url,
-        responseStatus: '${response.statusCode}',
-        errorMessage: 'Authentication failed: ${response.body}',
-      );
-      return false;
-    } catch (e) {
-      debugPrint('[ApiService] Auth info ($e). Continuing with local fallback...');
-      return false;
-    }
-  }
-
-  // Get authorization headers
-  Map<String, String> _getHeaders() {
-    return {
-      'Content-Type': 'application/json',
-      'Bypass-Tunnel-Reminder': 'true',
-      if (_token != null) 'Authorization': 'Bearer $_token',
-    };
-  }
-
-  // Fetch product details by barcode - Non-blocking guaranteed product model
-  Future<Product> getProductByBarcode(String rawBarcode) async {
-    final String cleanBarcode = rawBarcode.trim().replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]'), '');
-
-    // 1. Try local ProductLookupService first (instant match)
-    final localMatch = await ProductLookupService.getProductByBarcode(cleanBarcode);
-    if (localMatch != null) {
-      debugPrint('[ApiService] Found instant product match in ProductLookupService: ${localMatch.name}');
-      return localMatch;
-    }
-
-    // 2. Try remote backend lookup with 2-second timeout
-    try {
-      final activeBaseUrl = await getBaseUrl();
-      final encodedBarcode = Uri.encodeComponent(cleanBarcode);
-      final url = '$activeBaseUrl/api/products/barcode/$encodedBarcode';
-
-      if (_token == null) {
-        await _login();
-      }
-
-      final response = await http.get(
-        Uri.parse(url),
-        headers: _getHeaders(),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        return Product.fromBackendJson(data);
-      }
-    } catch (e) {
-      debugPrint('[ApiService] Remote query info: $e. Generating local product details...');
-    }
-
-    // 3. Fallback Product: Guaranteed to present details on every scan
-    final shortId = cleanBarcode.length > 6 ? cleanBarcode.substring(cleanBarcode.length - 6) : cleanBarcode;
-    return Product(
-      id: 'PRD-$shortId',
-      barcode: cleanBarcode,
-      name: 'Scanned Item ($cleanBarcode)',
-      category: 'General Inventory',
-      brand: 'Siddesh Tech',
-      model: 'STD-2026',
-      currentStock: 50,
-      minimumStock: 10,
-      availableStock: 45,
-      imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500',
-      supplier: 'Siddesh Infotech Supplier',
-    );
-  }
-
-  /// Official Mobile Barcode Lifecycle RPC Invocation:
-  /// Calls Supabase RPC `public.scan_receive` using:
-  ///   p_code: rawBarcode.trim(),
-  ///   p_client_txn_id: UUID,
-  ///   p_device_source: 'CAMERA'
+  /// Fetches a product by barcode from Supabase (the single source of truth).
   ///
-  /// The DB RPC updates product_barcodes.status:
-  ///   GENERATED → INWARDED → OUTWARDED
-  /// and creates barcode_scans + stock_ledger entries.
-  Future<Map<String, dynamic>> scanReceive({
-    required String rawBarcode,
-    String? clientTxnId,
-    String deviceSource = 'CAMERA',
-  }) async {
-    final String cleanBarcode = rawBarcode.trim().replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]'), '');
-    final String txnId = clientTxnId ?? const Uuid().v4();
-    final Map<String, dynamic> rpcPayload = {
-      'p_code': cleanBarcode,
-      'p_client_txn_id': txnId,
-      'p_device_source': deviceSource,
-    };
-
-    debugPrint('================ [TRACE: ApiService.scanReceive] ================');
-    debugPrint('[TRACE Payload] $rpcPayload');
-    debugPrint('================================================================');
-
-    // 1. Primary: Direct Supabase RPC scan_receive call (3 second timeout)
+  /// Throws [ProductNotFoundException] when the barcode isn't registered and
+  /// [NetworkException] when Supabase can't be reached. Never fabricates a product.
+  Future<Product> getProductByBarcode(String rawBarcode) async {
+    final code = rawBarcode
+        .trim()
+        .replaceAll(RegExp(r'[\x00-\x1F\x7F-\x9F​-‍﻿]'), '');
+    final Product? product;
     try {
-      debugPrint('[TRACE] STEP 1: Invoking direct Supabase RPC client.rpc("scan_receive", ...)...');
-      final res = await SupabaseService().scanReceive(
-        pCode: cleanBarcode,
-        pClientTxnId: txnId,
-        pDeviceSource: deviceSource,
-      ).timeout(const Duration(seconds: 3));
-      debugPrint('[TRACE] STEP 1 SUCCESS! Supabase RPC Response: $res');
-      if (res['ok'] == true || res['found'] == true || res['already'] == true) {
-        return res;
-      }
+      product = await _db.lookupProductByCode(code);
     } catch (e) {
-      debugPrint('[TRACE] STEP 1 FAILED or TIMED OUT: $e');
-      if (e.toString().contains('NO_OFFICE')) {
-        throw Exception('NO_OFFICE: user profile has no office assigned');
-      }
-      debugPrint('[TRACE] Falling back to STEP 2 (Spring Boot Gateway HTTP Endpoint)...');
+      debugPrint('[ApiService] Product lookup error: $e');
+      throw NetworkException(
+          'Could not reach Supabase. Check the internet connection and try again.');
     }
-
-    // 2. Gateway: HTTP endpoint executing PostgreSQL public.scan_receive RPC (3 second timeout)
-    try {
-      final activeBaseUrl = await getBaseUrl();
-      final url = '$activeBaseUrl/api/products/barcodes/scan-receive';
-
-      if (_token == null) {
-        debugPrint('[TRACE] Pre-authenticating with backend server...');
-        await _login().timeout(const Duration(seconds: 15));
-      }
-
-      debugPrint('[TRACE] STEP 2: Sending POST request to HTTP RPC Gateway: $url');
-      _logRequest('POST', url, headers: _getHeaders());
-      final response = await http.post(
-        Uri.parse(url),
-        headers: _getHeaders(),
-        body: jsonEncode(rpcPayload),
-      ).timeout(const Duration(seconds: 15));
-
-      _logResponse('POST', url, response.statusCode, response.body);
-      debugPrint('[TRACE] STEP 2 RESPONSE: Status=${response.statusCode}, Body=${response.body}');
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        return data;
-      } else if (response.body.contains('NO_OFFICE')) {
-        throw Exception('NO_OFFICE: user profile has no office assigned');
-      }
-    } catch (e) {
-      debugPrint('[TRACE] STEP 2 FAILED or TIMED OUT: $e');
-      if (e.toString().contains('NO_OFFICE')) rethrow;
+    if (product == null) {
+      throw ProductNotFoundException('No product found for "$code".');
     }
-
-    // 3. Fallback Result: Return positive status payload so user gets product details UI seamlessly
-    debugPrint('[TRACE] Returning fallback scan result to display product details...');
-    return {
-      'ok': true,
-      'found': true,
-      'already': false,
-      'replayed': false,
-      'barcode_id': txnId,
-      'status': 'INWARDED',
-      'code': cleanBarcode,
-      'message': 'Scan verified successfully'
-    };
+    return product;
   }
 
-  // Create product on backend server
+  /// Fetches the active product catalogue with live stock. Throws [NetworkException]
+  /// if Supabase is unreachable.
+  Future<List<Product>> getAllProducts({int page = 0, int size = 100}) async {
+    try {
+      return await _db.fetchProducts();
+    } catch (e) {
+      debugPrint('[ApiService] Error loading products: $e');
+      throw NetworkException('Could not reach Supabase to load products.');
+    }
+  }
+
+  /// Live dashboard statistics from the real balances/ledger. Returns zeros on failure.
+  Future<DashboardStats> getDashboardStats() async {
+    try {
+      final s = await _db.fetchDashboardStats();
+      return DashboardStats(
+        currentStock: s['currentStock'] ?? 0,
+        todayInward: s['todayInward'] ?? 0,
+        todayOutward: s['todayOutward'] ?? 0,
+        lowStockItems: s['lowStockItems'] ?? 0,
+      );
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching dashboard stats: $e');
+      return const DashboardStats();
+    }
+  }
+
+  /// Receives the scanned barcode via the `scan_receive` RPC (scan-driven stock). The RPC
+  /// decides the transition from the barcode's current status — GENERATED→INWARDED — and
+  /// records the scan + ledger so the unit is counted in stock.
+  Future<String> recordInward(
+      {String? barcode, int quantity = 1, int? productId}) async {
+    return _scan(barcode);
+  }
+
+  /// Dispatches the scanned barcode via the `scan_receive` RPC. On an already-received
+  /// barcode this advances INWARDED→OUTWARDED. Same scan-driven path as [recordInward].
+  Future<String> recordOutward(
+      {String? barcode, int quantity = 1, int? productId}) async {
+    return _scan(barcode);
+  }
+
+  /// Runs a scan through `scan_receive` and turns its result into a status string or a
+  /// user-facing error. The DB advances the lifecycle based on the barcode's current
+  /// status and records who/when/device.
+  Future<String> _scan(String? barcode) async {
+    final code = (barcode ?? '').trim();
+    if (code.isEmpty) throw Exception('No barcode provided.');
+
+    final Map<String, dynamic> res;
+    try {
+      res = await _db.scanReceive(code);
+    } catch (e) {
+      final text = e.toString();
+      if (text.contains('NO_OFFICE')) {
+        throw Exception('Your login has no office assigned. Contact the administrator.');
+      }
+      debugPrint('[ApiService] scan_receive error: $e');
+      throw Exception('Could not reach Supabase. Check the connection and try again.');
+    }
+
+    if (res['found'] == false) throw Exception("This barcode isn't registered yet.");
+    if (res['ok'] == false) {
+      throw Exception((res['error'] ?? 'Scan could not be recorded.').toString());
+    }
+    // ok — return the confirmed new status (or the terminal status if already handled).
+    return (res['status'] ?? 'DONE').toString();
+  }
+
+  /// Product creation is performed on the desktop app (it sets category/brand/unit and
+  /// generates barcodes). Kept so the generator screen compiles and shows a clear message.
   Future<Product> createProduct({
     required String name,
     required String barcode,
@@ -337,149 +155,22 @@ class ApiService {
     String? brand,
     List<String>? barcodes,
   }) async {
-    final activeBaseUrl = await getBaseUrl();
-    
-    if (_token == null) {
-      final authenticated = await _login();
-      if (!authenticated) {
-        throw UnauthorizedException('Authentication failed before creating product.');
-      }
-    }
-
-    final url = '$activeBaseUrl/api/products';
-    final payload = jsonEncode({
-      'name': name,
-      'barcode': barcode,
-      'code': barcode,
-      'price': price,
-      'quantity': quantity,
-      'description': description ?? '',
-      'sku': sku,
-      'category': category ?? 'General Merchandise',
-      'brand': brand ?? 'Generic',
-      if (barcodes != null && barcodes.isNotEmpty) 'barcodes': barcodes,
-    });
-
-    try {
-      _logRequest('POST', url, headers: _getHeaders(), body: payload);
-      final response = await http.post(
-        Uri.parse(url),
-        headers: _getHeaders(),
-        body: payload,
-      ).timeout(timeoutDuration);
-
-      _logResponse('POST', url, response.statusCode, response.body);
-
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        return Product.fromBackendJson(data);
-      } else {
-        throw ServerErrorException('Failed to create product on server (Status: ${response.statusCode}).');
-      }
-    } catch (e) {
-      _logError('POST', url, e);
-      rethrow;
-    }
+    throw ServerErrorException(
+        'Creating products from the mobile app is not supported yet — add products and generate barcodes on the desktop app.');
   }
 
-  // Fetch real-time Dashboard Statistics
-  Future<DashboardStats> getDashboardStats() async {
-    final activeBaseUrl = await getBaseUrl();
-
-    if (_token == null) {
-      await _login();
-    }
-
-    final url = '$activeBaseUrl/api/dashboard/stats';
-
-    try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: _getHeaders(),
-      ).timeout(timeoutDuration);
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        return DashboardStats.fromJson(data);
-      }
-      return const DashboardStats();
-    } catch (e) {
-      debugPrint('[ApiService] Error fetching dashboard stats: $e');
-      return const DashboardStats();
-    }
+  /// Verifies Supabase is reachable/authenticated. Returns the project URL on success,
+  /// or null. Kept for the Settings "Test Connection" control.
+  Future<String?> testConnection(String hostOrUrl) async {
+    final ok = await _db.ensureSignedIn();
+    return ok ? SupabaseService.supabaseUrl : null;
   }
 
-  // Record Inward inventory transaction
-  Future<bool> recordInward({String? barcode, int quantity = 1, int? productId}) async {
-    final activeBaseUrl = await getBaseUrl();
-    if (_token == null) await _login();
+  /// No manual backend override in the Supabase model. Kept so Settings compiles.
+  static void setManualBaseUrl(String? hostOrUrl) {}
 
-    final url = '$activeBaseUrl/api/dashboard/inward';
-    final payload = jsonEncode({
-      if (barcode != null) 'barcode': barcode,
-      if (barcode != null) 'code': barcode,
-      if (productId != null) 'productId': productId,
-      'quantity': quantity,
-    });
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: _getHeaders(),
-        body: payload,
-      ).timeout(const Duration(seconds: 15));
-      
-      if (response.statusCode == 200) return true;
-      
-      String errorMsg = 'Failed to record inward entry';
-      try {
-        final errData = jsonDecode(response.body);
-        if (errData['message'] != null) {
-          errorMsg = errData['message'];
-        }
-      } catch (_) {}
-      throw Exception(errorMsg);
-    } catch (e) {
-      debugPrint('[ApiService] Error recording inward transaction: $e');
-      rethrow;
-    }
-  }
-
-  // Record Outward inventory transaction
-  Future<bool> recordOutward({String? barcode, int quantity = 1, int? productId}) async {
-    final activeBaseUrl = await getBaseUrl();
-    if (_token == null) await _login();
-
-    final url = '$activeBaseUrl/api/dashboard/outward';
-    final payload = jsonEncode({
-      if (barcode != null) 'barcode': barcode,
-      if (barcode != null) 'code': barcode,
-      if (productId != null) 'productId': productId,
-      'quantity': quantity,
-    });
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: _getHeaders(),
-        body: payload,
-      ).timeout(const Duration(seconds: 15));
-      
-      if (response.statusCode == 200) return true;
-      
-      String errorMsg = 'Failed to record outward entry';
-      try {
-        final errData = jsonDecode(response.body);
-        if (errData['message'] != null) {
-          errorMsg = errData['message'];
-        }
-      } catch (_) {}
-      throw Exception(errorMsg);
-    } catch (e) {
-      debugPrint('[ApiService] Error recording outward transaction: $e');
-      rethrow;
-    }
-  }
+  /// Always null now — there is no manual LAN backend override.
+  static String? get manualBaseUrl => null;
 }
 
 class DashboardStats {

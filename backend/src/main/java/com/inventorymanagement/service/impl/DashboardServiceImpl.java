@@ -78,9 +78,10 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     @Transactional
-    public void recordInward(TransactionRequest request) {
+    public String recordInward(TransactionRequest request) {
         int qty = request != null ? Math.max(1, request.getQuantity()) : 1;
         String code = request != null ? request.getEffectiveBarcode() : "";
+        String confirmedStatus = "INWARDED";
 
         logger.info("2. DashboardService.recordInward() starts.");
         logger.info("3. Barcode value received: '{}'", code);
@@ -122,13 +123,21 @@ public class DashboardServiceImpl implements DashboardService {
             if (pbOpt.isPresent()) {
                 ProductBarcode pb = pbOpt.get();
                 if (!"GENERATED".equalsIgnoreCase(pb.getStatus())) {
-                    throw new IllegalStateException("Cannot inward: Barcode " + code + " is currently " + pb.getStatus() + ". Expected GENERATED.");
+                    String current = pb.getStatus() != null ? pb.getStatus().toUpperCase() : "";
+                    if ("INWARDED".equals(current)) {
+                        throw new IllegalStateException("This item is already in stock — it was inwarded earlier.");
+                    }
+                    if ("OUTWARDED".equals(current)) {
+                        throw new IllegalStateException("This item was already dispatched, so it can't be inwarded again.");
+                    }
+                    throw new IllegalStateException("This barcode isn't ready to be inwarded.");
                 }
                 pb.setStatus("INWARDED");
-                productBarcodeRepository.saveAndFlush(pb);
+                ProductBarcode saved = productBarcodeRepository.saveAndFlush(pb);
+                confirmedStatus = saved.getStatus();
                 logger.info("[RECORD INWARD SUCCESS] Updated ProductBarcode entity ID {} code '{}' status to INWARDED via saveAndFlush()", pb.getId(), pb.getCode());
             } else {
-                throw new IllegalStateException("Cannot inward: Barcode '" + code + "' not found in product_barcodes table!");
+                throw new IllegalStateException("This barcode isn't registered yet. Please generate it before inward.");
             }
 
             // Update product quantity in products table if present
@@ -144,13 +153,16 @@ public class DashboardServiceImpl implements DashboardService {
                 logger.info("Updated product '{}' (ID {}) stock quantity to {}", p.getName(), p.getId(), p.getQuantity());
             }
         }
+
+        return confirmedStatus;
     }
 
     @Override
     @Transactional
-    public void recordOutward(TransactionRequest request) {
+    public String recordOutward(TransactionRequest request) {
         int qty = request != null ? Math.max(1, request.getQuantity()) : 1;
         String code = request != null ? request.getEffectiveBarcode() : "";
+        String confirmedStatus = "OUTWARDED";
 
         logger.info("[TRANSACTION LOG] recordOutward STARTED: barcode='{}', quantity={}", code, qty);
 
@@ -190,13 +202,21 @@ public class DashboardServiceImpl implements DashboardService {
             if (pbOpt.isPresent()) {
                 ProductBarcode pb = pbOpt.get();
                 if (!"INWARDED".equalsIgnoreCase(pb.getStatus())) {
-                    throw new IllegalStateException("Cannot outward: Barcode " + code + " is currently " + pb.getStatus() + ". Expected INWARDED.");
+                    String current = pb.getStatus() != null ? pb.getStatus().toUpperCase() : "";
+                    if ("GENERATED".equals(current)) {
+                        throw new IllegalStateException("Please inward this item before dispatching it.");
+                    }
+                    if ("OUTWARDED".equals(current)) {
+                        throw new IllegalStateException("This item has already been dispatched.");
+                    }
+                    throw new IllegalStateException("This item isn't ready to be dispatched.");
                 }
                 pb.setStatus("OUTWARDED");
-                productBarcodeRepository.saveAndFlush(pb);
+                ProductBarcode saved = productBarcodeRepository.saveAndFlush(pb);
+                confirmedStatus = saved.getStatus();
                 logger.info("[RECORD OUTWARD SUCCESS] Updated ProductBarcode entity ID {} code '{}' status to OUTWARDED via saveAndFlush()", pb.getId(), pb.getCode());
             } else {
-                throw new IllegalStateException("Cannot outward: Barcode '" + code + "' not found in product_barcodes table!");
+                throw new IllegalStateException("This barcode isn't registered yet. Please generate and inward it first.");
             }
 
             // Update product quantity in products table if present
@@ -213,5 +233,7 @@ public class DashboardServiceImpl implements DashboardService {
                 log.info("Updated product '{}' (ID {}) stock quantity to {}", p.getName(), p.getId(), p.getQuantity());
             }
         }
+
+        return confirmedStatus;
     }
 }

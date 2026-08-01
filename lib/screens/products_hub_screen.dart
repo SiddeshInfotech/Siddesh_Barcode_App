@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
+import '../services/api_service.dart';
 import '../services/app_settings_service.dart';
-import '../services/product_lookup_service.dart';
 import 'product_detail_screen.dart';
 
 class ProductsHubScreen extends StatefulWidget {
@@ -13,8 +13,12 @@ class ProductsHubScreen extends StatefulWidget {
 }
 
 class _ProductsHubScreenState extends State<ProductsHubScreen> {
-  late final List<Product> _allProducts = ProductLookupService.getAllProducts();
+  final ApiService _apiService = ApiService();
   final TextEditingController _searchController = TextEditingController();
+
+  List<Product> _allProducts = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   String _searchQuery = '';
   String _selectedCategory = 'All';
@@ -27,6 +31,28 @@ class _ProductsHubScreenState extends State<ProductsHubScreen> {
         _searchQuery = _searchController.text.trim().toLowerCase();
       });
     });
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final products = await _apiService.getAllProducts();
+      if (!mounted) return;
+      setState(() {
+        _allProducts = products;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   @override
@@ -205,9 +231,32 @@ class _ProductsHubScreenState extends State<ProductsHubScreen> {
                   ),
                 ),
 
-                // Products List View
+                // Products List View — real data from the database with proper states
                 Expanded(
-                  child: filteredList.isEmpty
+                  child: Builder(
+                    builder: (context) {
+                      if (_isLoading) {
+                        return const Center(
+                          child: CircularProgressIndicator(color: AppColors.primary),
+                        );
+                      }
+                      if (_errorMessage != null) {
+                        return _HubStateMessage(
+                          icon: Icons.cloud_off_rounded,
+                          title: 'Could not load products',
+                          message: _errorMessage!,
+                          actionLabel: 'Retry',
+                          onAction: _loadProducts,
+                        );
+                      }
+                      if (_allProducts.isEmpty) {
+                        return const _HubStateMessage(
+                          icon: Icons.inventory_2_outlined,
+                          title: 'No products yet',
+                          message: 'Products you add will appear here.',
+                        );
+                      }
+                      return filteredList.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -383,13 +432,86 @@ class _ProductsHubScreenState extends State<ProductsHubScreen> {
                               ),
                             );
                           },
-                        ),
+                        );
+                    },
+                  ),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// A centered icon + title + message with an optional action button, used for the
+/// products hub loading/error/empty states so no screen ever shows a blank box.
+class _HubStateMessage extends StatelessWidget {
+  const _HubStateMessage({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 64, color: textSecondary.withValues(alpha: 0.4)),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                color: textSecondary,
+              ),
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: onAction,
+                child: Text(actionLabel!, style: const TextStyle(color: Colors.white)),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

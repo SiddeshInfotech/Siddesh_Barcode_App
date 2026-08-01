@@ -16,16 +16,18 @@ public interface DashboardService {
     DashboardStatsResponse getDashboardStats();
 
     /**
-     * Records an inward inventory movement transaction.
+     * Records an inward inventory movement transaction and advances the barcode status.
      *
      * @param request transaction details (productId, barcode, quantity)
+     * @return the barcode's confirmed status after the committed update (e.g. "INWARDED")
      */
-    void recordInward(TransactionRequest request);
+    String recordInward(TransactionRequest request);
 
     /**
-     * Records an outward inventory movement transaction.
+     * Records an outward inventory movement transaction and advances the barcode status.
      *
      * @param request transaction details (productId, barcode, quantity)
+     * @return the barcode's confirmed status after the committed update (e.g. "OUTWARDED")
      */
-    void recordOutward(TransactionRequest request);
+    String recordOutward(TransactionRequest request);
 }

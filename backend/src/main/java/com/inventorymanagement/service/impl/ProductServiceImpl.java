@@ -240,18 +240,10 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        log.info("PRODUCT AUTO-REGISTER: Barcode '{}' (raw: '{}') not matched in existing DB records. Registering new product entry automatically...", cleanBarcode, rawBarcode);
-        
-        CreateProductRequest req = new CreateProductRequest();
-        req.setName("Product (" + cleanBarcode + ")");
-        req.setBarcode(cleanBarcode);
-        req.setPrice(new java.math.BigDecimal("99.99"));
-        req.setQuantity(10);
-        req.setDescription("Auto-registered for scanned barcode: " + cleanBarcode);
-        req.setCategory("General");
-        req.setBrand("Generic");
-
-        return createProduct(req);
+        // Barcode is not in the database. The database is the single source of truth —
+        // do not fabricate a product. Return 404 so the client can offer to create it.
+        log.info("PRODUCT LOOKUP MISS: Barcode '{}' (raw: '{}') not found in products or product_barcodes.", cleanBarcode, rawBarcode);
+        throw new ResourceNotFoundException("No product found for barcode: " + cleanBarcode);
     }
 
     @Override

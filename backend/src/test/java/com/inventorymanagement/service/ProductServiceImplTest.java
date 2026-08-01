@@ -159,13 +159,14 @@ public class ProductServiceImplTest {
     }
 
     @Test
-    public void testGetProductByBarcode_NotFound_AutoCreatesProduct() {
+    public void testGetProductByBarcode_NotFound_ThrowsException() {
+        // The database is the single source of truth — an unknown barcode is a 404,
+        // never an auto-created product.
         when(productRepository.findByBarcodeIgnoreCase(anyString())).thenReturn(Optional.empty());
         when(productBarcodeRepository.findByCodeIgnoreCase(anyString())).thenReturn(Optional.empty());
-        when(productRepository.save(any(Product.class))).thenReturn(product);
 
-        ProductResponse response = productService.getProductByBarcode("1234567890");
-        assertNotNull(response);
+        assertThrows(ResourceNotFoundException.class,
+                () -> productService.getProductByBarcode("1234567890"));
     }
 
     @Test

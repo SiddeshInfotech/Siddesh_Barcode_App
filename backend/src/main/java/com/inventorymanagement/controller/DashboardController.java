@@ -51,14 +51,18 @@ public class DashboardController {
     @PostMapping("/inward")
     @PreAuthorize("hasAnyRole('ADMIN', 'STORE_MANAGER', 'SALES_EXECUTIVE')")
     @Operation(summary = "Record Inward Transaction", description = "Records inward inventory transaction and updates total stock metrics.")
-    public ResponseEntity<Void> recordInward(@RequestBody TransactionRequest request) {
+    public ResponseEntity<java.util.Map<String, Object>> recordInward(@RequestBody TransactionRequest request) {
         log.info("1. DashboardController received POST /api/dashboard/inward | Payload: barcode='{}'", request != null ? request.getBarcode() : null);
         log.info("[STEP 3] Controller entered: POST /api/dashboard/inward | Barcode: '{}', Quantity: {}, ProductId: {}",
                 request != null ? request.getBarcode() : "NULL",
                 request != null ? request.getQuantity() : 0,
                 request != null ? request.getProductId() : "NULL");
-        dashboardService.recordInward(request);
-        return ResponseEntity.ok().build();
+        String status = dashboardService.recordInward(request);
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("status", status);
+        body.put("code", request != null ? request.getEffectiveBarcode() : null);
+        body.put("quantity", request != null ? Math.max(1, request.getQuantity()) : 1);
+        return ResponseEntity.ok(body);
     }
 
     /**
@@ -70,12 +74,16 @@ public class DashboardController {
     @PostMapping("/outward")
     @PreAuthorize("hasAnyRole('ADMIN', 'STORE_MANAGER', 'SALES_EXECUTIVE')")
     @Operation(summary = "Record Outward Transaction", description = "Records outward inventory transaction and updates total stock metrics.")
-    public ResponseEntity<Void> recordOutward(@RequestBody TransactionRequest request) {
+    public ResponseEntity<java.util.Map<String, Object>> recordOutward(@RequestBody TransactionRequest request) {
         log.info("[STEP 3] Controller entered: POST /api/dashboard/outward | Barcode: '{}', Quantity: {}, ProductId: {}",
                 request != null ? request.getBarcode() : "NULL",
                 request != null ? request.getQuantity() : 0,
                 request != null ? request.getProductId() : "NULL");
-        dashboardService.recordOutward(request);
-        return ResponseEntity.ok().build();
+        String status = dashboardService.recordOutward(request);
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("status", status);
+        body.put("code", request != null ? request.getEffectiveBarcode() : null);
+        body.put("quantity", request != null ? Math.max(1, request.getQuantity()) : 1);
+        return ResponseEntity.ok(body);
     }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
 import '../services/api_service.dart';
+import '../services/scan_history_service.dart';
 
 class InwardEntryScreen extends StatefulWidget {
   const InwardEntryScreen({
@@ -117,8 +118,11 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
       debugPrint('[STEP 2] Recording inward entry for product ${_activeProduct.name} (Qty: $_quantity)');
       debugPrint('======================================================');
 
+      String confirmedStatus;
       try {
-        await ApiService().recordInward(
+        // Update the database first; only proceed to the success message once the
+        // backend confirms the committed status change.
+        confirmedStatus = await ApiService().recordInward(
           barcode: targetBarcode,
           quantity: _quantity,
           productId: intId,
@@ -139,6 +143,16 @@ class _InwardEntryScreenState extends State<InwardEntryScreen> {
         );
         return;
       }
+
+      // DB confirmed — now record history with the real, confirmed status.
+      ScanHistoryService().addScan(
+        barcode: targetBarcode,
+        productName: _activeProduct.name,
+        category: _activeProduct.category,
+        entryType: 'Inward',
+        quantity: _quantity,
+      );
+      debugPrint('[INWARD ENTRY] DB confirmed status: $confirmedStatus');
 
       if (!mounted) return;
 

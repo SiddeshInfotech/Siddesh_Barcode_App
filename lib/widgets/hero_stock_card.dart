@@ -5,13 +5,16 @@ import '../constants/app_constants.dart';
 class HeroStockCard extends StatefulWidget {
   const HeroStockCard({
     super.key,
-    this.stockCount = '1246',
-    this.percentage = '12.5%',
+    required this.stockCount,
+    this.percentage,
     this.onTap,
   });
 
   final String stockCount;
-  final String percentage;
+
+  /// Optional trend text (e.g. "12.5%"). The trend badge is hidden when null/empty,
+  /// so the card never shows a fabricated comparison.
+  final String? percentage;
   final VoidCallback? onTap;
 
   @override
@@ -116,49 +119,51 @@ class _HeroStockCardState extends State<HeroStockCard>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
+                            if (widget.percentage != null && widget.percentage!.isNotEmpty) ...[
+                              const SizedBox(height: 14),
 
-                            // Peach/Orange Trend Badge (^ 12.5%) vs last month
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
+                              // Peach/Orange Trend Badge (^ 12.5%) vs last month
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.orangeBadgeBg,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.keyboard_arrow_up_rounded,
+                                          color: AppColors.orangeBadgeText,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          widget.percentage!,
+                                          style: AppTextStyles.badgeText,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.orangeBadgeBg,
-                                    borderRadius: BorderRadius.circular(20),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'vs last month',
+                                    style: TextStyle(
+                                      fontFamily: 'Inter',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w400,
+                                      color: Color(0xFF94A3B8),
+                                    ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.keyboard_arrow_up_rounded,
-                                        color: AppColors.orangeBadgeText,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        widget.percentage,
-                                        style: AppTextStyles.badgeText,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'vs last month',
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w400,
-                                    color: Color(0xFF94A3B8),
-                                  ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
