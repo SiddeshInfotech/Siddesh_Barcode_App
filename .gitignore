@@ -126,3 +126,7 @@ target/
 # Symbolication & Obfuscation
 app.*.symbols
 app.*.map.json
+
+
+
+/.apps/
