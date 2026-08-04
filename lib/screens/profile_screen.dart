@@ -522,44 +522,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 color: textSecondary,
                               ),
                             ),
-
-                            const SizedBox(height: 14),
-
-                            // System Administrator Role Pill Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: const Color(0xFFDBEAFE),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    CupertinoIcons.shield_fill,
-                                    size: 14,
-                                    color: Color(0xFF3B82F6),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    user.role,
-                                    style: const TextStyle(
-                                      fontFamily: 'Inter',
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF3B82F6),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -608,16 +570,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                       const SizedBox(height: 12),
 
-                      // 4. Role Glass Card
-                      _ProfileInfoGlassCard(
-                        icon: CupertinoIcons.shield_fill,
-                        label: 'Role',
-                        value: user.role,
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // 5. Member Since Glass Card
+                      // 4. Member Since Glass Card
                       _ProfileInfoGlassCard(
                         icon: CupertinoIcons.calendar,
                         label: 'Member Since',

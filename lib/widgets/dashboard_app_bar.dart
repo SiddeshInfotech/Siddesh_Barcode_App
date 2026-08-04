@@ -54,44 +54,11 @@ class _DashboardAppBarState extends State<DashboardAppBar>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textPrimary = isDark ? const Color(0xFFF8FAFC) : AppColors.textPrimary;
-    final textSecondary = isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary;
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Left Column: Hello Admin & Dashboard
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Text(
-                  'Hello, ${widget.userName}',
-                  style: AppTextStyles.cardSubtitle.copyWith(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: textSecondary,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Text('👋', style: TextStyle(fontSize: 14)),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Dashboard',
-              style: AppTextStyles.sectionTitle.copyWith(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                color: textPrimary,
-              ),
-            ),
-          ],
-        ),
+        const SizedBox.shrink(),
 
         // Right: Notification Bell Button with Red Badge '0'
         AnimatedBuilder(

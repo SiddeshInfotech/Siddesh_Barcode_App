@@ -28,15 +28,17 @@ class FloatingBottomNavigation extends StatelessWidget {
       valueListenable: AppSettingsService().localeNotifier,
       builder: (context, _, __) {
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          margin: EdgeInsets.zero,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: cardBg,
-            borderRadius: BorderRadius.circular(AppRadii.pill),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             boxShadow: isDark ? const [] : AppShadows.nav,
-            border: Border.all(
-              color: borderColor,
-              width: 1.5,
+            border: Border(
+              top: BorderSide(
+                color: borderColor,
+                width: 1.5,
+              ),
             ),
           ),
           child: Row(
@@ -46,7 +48,6 @@ class FloatingBottomNavigation extends StatelessWidget {
               _NavItem(
                 icon: Icons.home_rounded,
                 activeIcon: Icons.home_rounded,
-                label: AppTranslation.tr('home'),
                 isSelected: selectedIndex == 0,
                 onTap: () => onItemTapped(0),
               ),
@@ -55,7 +56,6 @@ class FloatingBottomNavigation extends StatelessWidget {
               _NavItem(
                 icon: Icons.qr_code_scanner_rounded,
                 activeIcon: Icons.qr_code_scanner_rounded,
-                label: AppTranslation.tr('scanner'),
                 isSelected: selectedIndex == 1,
                 onTap: () => onItemTapped(1),
               ),
@@ -64,7 +64,6 @@ class FloatingBottomNavigation extends StatelessWidget {
               _NavItem(
                 icon: Icons.history_rounded,
                 activeIcon: Icons.history_rounded,
-                label: AppTranslation.tr('history'),
                 isSelected: selectedIndex == 2,
                 onTap: () => onItemTapped(2),
               ),
@@ -73,7 +72,6 @@ class FloatingBottomNavigation extends StatelessWidget {
               _NavItem(
                 icon: Icons.settings_outlined,
                 activeIcon: Icons.settings_rounded,
-                label: AppTranslation.tr('settings'),
                 isSelected: selectedIndex == 3,
                 onTap: () => onItemTapped(3),
               ),
@@ -89,14 +87,12 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
     required this.activeIcon,
-    required this.label,
     required this.isSelected,
     required this.onTap,
   });
 
   final IconData icon;
   final IconData activeIcon;
-  final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -114,32 +110,17 @@ class _NavItem extends StatelessWidget {
         duration: const Duration(milliseconds: 240),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 16 : 10,
-          vertical: 6,
+          horizontal: isSelected ? 18 : 14,
+          vertical: 10,
         ),
         decoration: BoxDecoration(
           color: isSelected ? activeBg : Colors.transparent,
           borderRadius: BorderRadius.circular(22),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? activeIcon : icon,
-              color: isSelected ? activeFg : inactiveFg,
-              size: 22,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? activeFg : inactiveFg,
-              ),
-            ),
-          ],
+        child: Icon(
+          isSelected ? activeIcon : icon,
+          color: isSelected ? activeFg : inactiveFg,
+          size: 24,
         ),
       ),
     );

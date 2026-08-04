@@ -121,20 +121,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF090D16) : const Color(0xFFEFF4FA),
+      backgroundColor: isDark ? const Color(0xFF090D16) : Colors.white,
       body: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF090D16) : const Color(0xFFEFF4FA),
-          gradient: isDark ? null : AppGradients.background,
-        ),
+        color: isDark ? const Color(0xFF090D16) : Colors.white,
         child: SafeArea(
           child: FadeTransition(
             opacity: _fadeIn,
             child: Stack(
               children: [
-                // Subtle Background Blobs
-                const _BackgroundBlobs(),
-
                 // Horizontal Smooth Sliding PageView
                 PageView(
                   controller: _pageController,
@@ -176,7 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   Positioned(
                     left: 0,
                     right: 0,
-                    bottom: 10,
+                    bottom: 0,
                     child: FloatingBottomNavigation(
                       selectedIndex: _selectedNavIndex,
                       onItemTapped: _onTabTapped,
@@ -233,9 +227,9 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.page,
-            12,
+            0,
             AppSpacing.page,
-            110, // Extra bottom padding for floating nav bar
+            90, // Extra bottom padding for floating nav bar
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,7 +247,7 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 4),
 
               // Hero Stock Card with Slide Down animation
               SlideTransition(
@@ -271,10 +265,10 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
                 position: widget.statsSlideUp,
                 child: Row(
                   children: [
-                    // Card 1: Today's Inward
+                    // Card 1: Inward
                     Expanded(
                       child: StatisticCard(
-                        title: AppTranslation.tr('todaysInward'),
+                        title: AppTranslation.tr('inward'),
                         value: '28',
                         subtitle: AppTranslation.tr('items'),
                         valueColor: textPrimary,
@@ -287,10 +281,10 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
                     ),
                     const SizedBox(width: 12),
 
-                    // Card 2: Today's Outward
+                    // Card 2: Outward
                     Expanded(
                       child: StatisticCard(
-                        title: AppTranslation.tr('todaysOutward'),
+                        title: AppTranslation.tr('outward'),
                         value: '17',
                         subtitle: AppTranslation.tr('items'),
                         valueColor: textPrimary,
@@ -328,7 +322,7 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
-                      '3 actions',
+                      '2 actions',
                       style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 12,
@@ -372,19 +366,6 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
                           : AppColors.greenTileBg,
                       onTap: widget.onOpenOutwardScanner,
                     ),
-                    const SizedBox(height: 12),
-
-                    // 3: Products Hub Card
-                    QuickAccessCard(
-                      title: AppTranslation.tr('products'),
-                      subtitle: AppTranslation.tr('manageInventory'),
-                      icon: Icons.inventory_2_outlined,
-                      iconColor: AppColors.purple,
-                      iconBgColor: isDark
-                          ? const Color(0xFF312E81)
-                          : AppColors.purpleTileBg,
-                      onTap: widget.onNavigateToProducts,
-                    ),
                   ],
                 ),
               ),
@@ -396,63 +377,4 @@ class _HomeDashboardViewState extends State<_HomeDashboardView>
   }
 }
 
-class _BackgroundBlobs extends StatelessWidget {
-  const _BackgroundBlobs();
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          // Top Right Subtle Soft Blue Blob
-          Positioned(
-            top: -60,
-            right: -60,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark
-                    ? const Color(0xFF3B82F6).withValues(alpha: 0.06)
-                    : AppColors.primary.withValues(alpha: 0.08),
-              ),
-            ),
-          ),
-          // Middle Left Subtle Soft Blue Blob
-          Positioned(
-            top: 280,
-            left: -80,
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark
-                    ? const Color(0xFF60A5FA).withValues(alpha: 0.05)
-                    : AppColors.secondary.withValues(alpha: 0.07),
-              ),
-            ),
-          ),
-          // Bottom Right Subtle Purple/Blue Blob
-          Positioned(
-            bottom: 40,
-            right: -60,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark
-                    ? const Color(0xFF8B5CF6).withValues(alpha: 0.04)
-                    : AppColors.purple.withValues(alpha: 0.04),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

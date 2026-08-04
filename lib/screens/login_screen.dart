@@ -216,76 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       onTap: _handleLogin,
                     ),
 
-                    const SizedBox(height: 32),
-
-                    // Divider: OR CONTINUE WITH
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Divider(
-                            color: Colors.grey.withValues(alpha: 0.3),
-                            thickness: 1,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          child: Text(
-                            'OR CONTINUE WITH',
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF9CA3AF),
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Divider(
-                            color: Colors.grey.withValues(alpha: 0.3),
-                            thickness: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Social Buttons Row (Google & Apple)
-                    Row(
-                      children: [
-                        // Google Button
-                        Expanded(
-                          child: _SocialGlassButton(
-                            iconWidget: Image.network(
-                              'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg',
-                              width: 20,
-                              height: 20,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(CupertinoIcons.globe,
-                                      size: 20, color: Color(0xFF3B82F6)),
-                            ),
-                            label: 'Google',
-                            onTap: _handleLogin,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        // Apple Button
-                        Expanded(
-                          child: _SocialGlassButton(
-                            iconWidget: const Icon(
-                              Icons.apple,
-                              size: 24,
-                              color: Color(0xFF101010),
-                            ),
-                            label: 'Apple',
-                            onTap: _handleLogin,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 28),
 
                     // Bottom Register Link
                     Row(
@@ -482,64 +413,7 @@ class _LargeBlackButtonState extends State<_LargeBlackButton> {
   }
 }
 
-/// Social Glass Button Widget
-class _SocialGlassButton extends StatelessWidget {
-  const _SocialGlassButton({
-    required this.iconWidget,
-    required this.label,
-    required this.onTap,
-  });
 
-  final Widget iconWidget;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.9),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              iconWidget,
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF101010),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// Background Ambient Blobs
 class _LoginBackgroundBlobs extends StatelessWidget {
